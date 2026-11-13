@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
 from inventory.models import (Location, OperationType, Partner, UoM, UoMCategory, Warehouse, ZraConfig)
@@ -29,4 +30,5 @@ class Command(BaseCommand):
             name="Internal Transfers", prefix="INT", default_source=stock, default_dest=stock))
         Partner.objects.get_or_create(name="Walk-in customer", defaults=dict(is_customer=True))
         ZraConfig.get()
+        Group.objects.get_or_create(name="Storekeeper")
         self.stdout.write(self.style.SUCCESS("Inventory defaults are in place."))

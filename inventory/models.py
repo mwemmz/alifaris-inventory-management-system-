@@ -320,3 +320,20 @@ class ApiToken(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class SyncPeer(models.Model):
+    """Another installation (usually the head office server) this site exchanges data with."""
+    name = models.CharField(max_length=80)
+    url = models.CharField(max_length=200, help_text="Base address, for example https://erp.example.com")
+    token = models.CharField(max_length=80, help_text="A POS API token created on the other server")
+    active = models.BooleanField(default=True)
+    pull_products = models.BooleanField(default=True, help_text="Copy new and changed products from the other server")
+    last_product_pull = models.DateTimeField(null=True, blank=True, editable=False)
+    last_move_pull = models.DateTimeField(null=True, blank=True, editable=False)
+    last_move_push = models.DateTimeField(null=True, blank=True, editable=False)
+    last_result = models.CharField(max_length=300, blank=True, editable=False)
+    last_run = models.DateTimeField(null=True, blank=True, editable=False)
+
+    def __str__(self):
+        return self.name

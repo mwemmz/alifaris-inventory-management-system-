@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -79,6 +80,8 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        # WAL lets the POS write while managers read; the timeout waits instead of failing on a busy database
+        "OPTIONS": {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"},
     }
 }
 
@@ -118,6 +121,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT.mkdir(exist_ok=True)  # WhiteNoise warns if the folder is missing before collectstatic
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -139,3 +144,5 @@ COMPANY_NAME = 'Alifaris Auto Spares Main'
 # Short code of this installation (shop/branch). Stamped on every stock move so sites can sync safely.
 SITE_CODE = os.environ.get("ALIFARIS_SITE_CODE", "MAIN")
 ALLOW_NEGATIVE_STOCK = os.environ.get("ALIFARIS_ALLOW_NEGATIVE_STOCK", "1") == "1"
+
+HOME_NOTICE = os.environ.get("ALIFARIS_HOME_NOTICE", "")

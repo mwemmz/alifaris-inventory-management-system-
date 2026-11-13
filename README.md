@@ -55,11 +55,39 @@ If the POS shares this database directly, call the same functions in `inventory/
 
 ## Several sites, offline
 
-Each shop runs its own copy with its own `ALIFARIS_SITE_CODE`, so it keeps working without internet. Copy ledger rows
-between sites with `/api/v1/sync/moves/` (pull with `since` and `exclude_site`, push to the other side). Sites must use
-the same product references and the same location names. A scheduled sync job is not included yet.
+Each shop runs its own copy with its own `ALIFARIS_SITE_CODE`, so it keeps working without internet. Under
+Configuration > Site sync, add the head-office server as a peer (its address and a POS API token created there).
+`python manage.py sync_sites` (or the **Sync now** button) then:
+
+1. copies new and changed **products** from head office to the shop,
+2. pulls stock moves made at other sites, and
+3. pushes this shop's moves to head office.
+
+Moves carry a unique id, so a sync that is repeated or interrupted never counts anything twice, and progress is saved
+after every step. Schedule it every few minutes with Windows Task Scheduler or cron. Sites must use the same location
+names (the seed command creates `SHOP/Stock`, `Vendors`, `Customers`, `Inventory adjustment`, `Scrap`); a move for a
+location or product the other site does not have fails the batch and is reported on the Site sync screen.
+Stock quantities are never copied directly; they are always rebuilt from moves.
+
+## Roles
+
+- **Staff users** (managers): everything, including Configuration, Import and ZRA settings.
+- **Storekeeper group** (created by `seed_inventory`): record receipts, deliveries, transfers, counts, scrap and edit products.
+- **Any other logged-in user**: view only.
+
+## Deploying
+
+    pip install -r requirements.txt
+    python manage.py collectstatic --noinput
+    DJANGO_DEBUG=0 DJANGO_SECRET_KEY=<long random> DJANGO_ALLOWED_HOSTS=erp.example.com gunicorn config.wsgi
+
+Static files are served by WhiteNoise. Uploaded product images live in `media/` and need to be served by your web
+server (or put behind a proxy) when `DJANGO_DEBUG=0`. The database is SQLite in WAL mode, which is fine for one shop
+with a POS and a few users; **back up `db.sqlite3` regularly** (copy it while the app is idle, or use `sqlite3 db.sqlite3 ".backup copy.db"`).
+Move to PostgreSQL if one server will carry several busy shops. Put the site behind HTTPS before using it away from your own network.
 
 ## Mobile PWA and desktop
 
 The site is installable on a phone (manifest and service worker). Pages you have opened stay readable offline; saving
-changes needs a connection. `desktop/` holds an Electron shell (see its README; not yet built or run).
+changes on a phone needs a connection (a shop that must work offline runs its own server and syncs, above).
+`desktop/` holds an Electron shell (see its README; syntax-checked but not yet built or run).

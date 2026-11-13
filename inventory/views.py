@@ -10,9 +10,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from . import forms as f
-from .models import (ApiToken, LandedCost, Location, OperationType, Picking, Product, Scrap, StockMove, StockQuant,
+from .models import (SyncPeer, ApiToken, LandedCost, Location, OperationType, Picking, Product, Scrap, StockMove, StockQuant,
                      ZraConfig, ZraLog)
-from .services import importer, stock, zra
+from .services import importer, stock, sync as sync_service, zra
+from .permissions import editor_required, post_needs_editor, can_edit
 from .services.stock import StockError
 
 staff_required = user_passes_test(lambda u: u.is_active and u.is_staff, login_url="login")
@@ -22,7 +23,8 @@ OP_TITLES = {"receipts": "Receipts", "deliveries": "Deliveries", "internal": "In
 
 
 def ctx(request, **extra):
-    base = {"company": settings.COMPANY_NAME, "unread": 2, "site_code": settings.SITE_CODE}
+    base = {"company": settings.COMPANY_NAME, "unread": 2, "site_code": settings.SITE_CODE,
+            "can_edit": can_edit(request.user)}
     base.update(extra)
     return base
 
@@ -68,7 +70,7 @@ def picking_list(request, kind):
                  rows, new_url=f"/inventory/operations/{kind}/new/", note="Filter: ?state=draft or ?state=done or ?q=text")
 
 
-@login_required
+@editor_required
 def picking_new(request, kind):
     if kind not in OPS:
         raise Http404
@@ -81,6 +83,7 @@ def picking_new(request, kind):
 
 
 @login_required
+@post_needs_editor
 def picking_detail(request, pk):
     return _picking_form(request, get_object_or_404(Picking.objects.select_related("op_type"), pk=pk))
 
@@ -105,7 +108,7 @@ def _picking_form(request, picking, new=False):
                                                               title=OP_TITLES[kind]))
 
 
-@login_required
+@editor_required
 @require_POST
 def picking_action(request, pk, action):
     picking = get_object_or_404(Picking, pk=pk)
@@ -127,6 +130,7 @@ def picking_action(request, pk, action):
 
 # ---------------------------------------------------------------- adjustments
 @login_required
+@post_needs_editor
 def physical_inventory(request):
     locations = Location.objects.filter(usage=Location.INTERNAL, active=True)
     loc = locations.filter(pk=request.GET.get("location") or request.POST.get("location")).first() or locations.first()
@@ -166,7 +170,7 @@ def scrap_list(request):
                  new_url="/inventory/scrap/new/")
 
 
-@login_required
+@editor_required
 def scrap_new(request):
     form = f.ScrapForm(request.POST or None)
     if form.is_valid():
@@ -189,7 +193,7 @@ def landed_list(request):
                  new_url="/inventory/landed-costs/new/")
 
 
-@login_required
+@editor_required
 def landed_new(request):
     form = f.LandedCostForm(request.POST or None)
     if form.is_valid():
@@ -200,6 +204,7 @@ def landed_new(request):
 
 
 @login_required
+@post_needs_editor
 def landed_detail(request, pk):
     lc = get_object_or_404(LandedCost, pk=pk)
     if request.method == "POST":
@@ -213,6 +218,7 @@ def landed_detail(request, pk):
 
 
 @login_required
+@post_needs_editor
 def replenishment(request):
     rows_data = stock.replenishment_candidates()
     if request.method == "POST" and rows_data:
@@ -255,6 +261,7 @@ def products(request):
 
 
 @login_required
+@post_needs_editor
 def product_edit(request, pk=None):
     product = get_object_or_404(Product, pk=pk) if pk else None
     form = f.ProductForm(request.POST or None, request.FILES or None, instance=product)
@@ -456,3 +463,14 @@ def lookup(request):
         return JsonResponse({"found": False}, status=404)
     return JsonResponse({"found": True, "id": p.pk, "ref": p.internal_ref, "name": p.name, "price": str(p.price),
                          "on_hand": str(p.on_hand)})
+
+
+# ---------------------------------------------------------------- site sync
+@staff_required
+def sync_peers(request):
+    if request.method == "POST":
+        peer = get_object_or_404(SyncPeer, pk=request.POST.get("peer"))
+        ok, msg = sync_service.sync_peer(peer)
+        (messages.success if ok else messages.error)(request, f"{peer.name}: {msg}")
+        return redirect("inventory:sync")
+    return render(request, "inventory/sync.html", ctx(request, peers=SyncPeer.objects.all()))

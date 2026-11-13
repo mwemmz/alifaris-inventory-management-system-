@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory, modelform_factory
 
-from .models import (ApiToken, LandedCost, Location, Partner, Picking, PickingLine, Product, ProductCategory,
+from .models import (SyncPeer, ApiToken, LandedCost, Location, Partner, Picking, PickingLine, Product, ProductCategory,
                      Scrap, UoM, UoMCategory, Warehouse, ZraConfig)
 
 
@@ -80,5 +80,6 @@ CRUD = {
     "categories": (ProductCategory, ["name", "parent"], "Product categories"),
     "uom-categories": (UoMCategory, ["name"], "UoM categories"),
     "uoms": (UoM, ["name", "category", "ratio", "zra_qty_code", "zra_pkg_code"], "Units of measure"),
+    "sync-peers": (SyncPeer, ["name", "url", "token", "active", "pull_products"], "Sync peers"),
     "partners": (Partner, ["name", "is_supplier", "is_customer", "phone", "email", "tpin"], "Contacts"),
 }

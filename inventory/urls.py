@@ -26,6 +26,7 @@ urlpatterns = [
     path("reporting/moves/", v.report_moves, name="report_moves"),
     path("reporting/analysis/", v.report_analysis, name="report_analysis"),
     path("reporting/valuation/", v.report_valuation, name="report_valuation"),
+    path("config/sync/", v.sync_peers, name="sync"),
     path("config/zra/", v.zra_settings, name="zra_settings"),
     path("config/api-tokens/", v.tokens, name="tokens"),
     path("config/<slug:key>/", v.crud_list, name="crud_list"),

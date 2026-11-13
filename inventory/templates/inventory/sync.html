@@ -1,0 +1,9 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Site sync</h1><a class="btn" href="{% url 'inventory:crud_new' 'sync-peers' %}">Add peer</a></div>
+<p class="note">This site is <b>{{ site_code }}</b>. A peer is another installation (usually head office). Products are copied from the peer; stock moves are exchanged both ways and can never be counted twice. Run <code>python manage.py sync_sites</code> every few minutes from Task Scheduler or cron to do this automatically.</p>
+<table class="list"><thead><tr><th>Peer</th><th>Address</th><th>Last run</th><th>Result</th><th></th></tr></thead><tbody>
+{% for p in peers %}<tr><td><a href="{% url 'inventory:crud_edit' 'sync-peers' p.pk %}">{{ p.name }}</a>{% if not p.active %} (off){% endif %}</td><td>{{ p.url }}</td><td>{{ p.last_run|date:"Y-m-d H:i"|default:"never" }}</td><td>{{ p.last_result }}</td>
+<td><form method="post" class="inline">{% csrf_token %}<button class="btn ghost" name="peer" value="{{ p.pk }}">Sync now</button></form></td></tr>
+{% empty %}<tr><td colspan="5" class="empty">No peers yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

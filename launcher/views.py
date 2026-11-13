@@ -9,12 +9,33 @@ from django.shortcuts import render
 from . import modules
 
 
+def _notice():
+    """One alert for the home screen: ZRA trouble first, then low stock, then an optional fixed message."""
+    try:
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from inventory.models import ZraConfig, ZraLog
+        from inventory.services import stock
+        cfg = ZraConfig.get()
+        failed = ZraLog.objects.filter(status="error", date__gte=timezone.now() - timedelta(hours=24)).count()
+        if cfg.enabled and failed:
+            return f"{failed} ZRA request(s) failed in the last 24 hours. Open Inventory > ZRA Logs to see why."
+        low = len(stock.replenishment_candidates())
+        if low:
+            return f"{low} product(s) are below their reorder minimum. Open Inventory > Replenishment."
+    except Exception:
+        pass  # the home screen must always load
+    return settings.HOME_NOTICE or None
+
+
 @login_required
 def home(request):
     ctx = {
         "tiles": modules.tiles(),
         "company": settings.COMPANY_NAME,
-        "notice": "Welcome to Alifaris ERP. Log in as an administrator to finish setting up your company.",
+        "notice": _notice(),
         "unread": 2,
     }
     return render(request, "launcher/home.html", ctx)

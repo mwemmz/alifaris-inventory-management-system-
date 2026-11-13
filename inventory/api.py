@@ -10,7 +10,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import ApiToken, Location, OperationType, Picking, Product, StockMove
-from .services import stock
+from .services import stock, sync
 from .services.stock import StockError
 
 
@@ -56,12 +56,15 @@ def product_json(p):
     return {"id": p.pk, "ref": p.internal_ref, "barcode": p.barcode, "name": p.name,
             "price": str(p.price), "secondary_price": str(p.secondary_price), "tax_type": p.tax_type,
             "category": p.category.name if p.category_id else None, "on_hand": str(p.on_hand),
-            "type": p.product_type, "active": p.active, "updated": p.updated.isoformat()}
+            "type": p.product_type, "active": p.active, "updated": p.updated.isoformat(),
+            "cost": str(p.cost), "min_qty": str(p.min_qty), "max_qty": str(p.max_qty),
+            "uom": p.uom.name if p.uom_id else None, "zra_item_class_code": p.zra_item_class_code,
+            "zra_item_type": p.zra_item_type}
 
 
 @api
 def products(request):
-    qs = Product.objects.select_related("category")
+    qs = Product.objects.select_related("category", "uom")
     if q := request.GET.get("q"):
         qs = qs.filter(name__icontains=q) | qs.filter(internal_ref__iexact=q) | qs.filter(barcode=q)
     if since := request.GET.get("updated_since"):
@@ -141,13 +144,6 @@ def sale_returns(request):
     return JsonResponse({"picking": picking.ref, "duplicate": False, "state": picking.state}, status=201)
 
 
-def _loc(name):
-    for loc in Location.objects.select_related("warehouse", "parent"):
-        if loc.full_name == name:
-            return loc
-    raise Location.DoesNotExist(f"Unknown location: {name}")
-
-
 @api
 def sync_moves(request):
     """GET: ledger rows recorded here since `since`. POST: apply rows from another site (idempotent by uuid)."""
@@ -168,13 +164,5 @@ def sync_moves(request):
             "recorded_at": m.recorded_at.isoformat()} for m in rows]})
     if request.method != "POST":
         return JsonResponse({"error": "GET or POST only"}, status=405)
-    applied = skipped = 0
-    with transaction.atomic():
-        for m in _body(request).get("moves", []):
-            _, created = stock.apply_move(Product.objects.get(internal_ref=m["ref"]), _loc(m["source"]),
-                                          _loc(m["dest"]), _dec(m["qty"]), uuid=m["uuid"], reason=m.get("reason", ""),
-                                          date=parse_datetime(m["date"]), unit_cost=_dec(m.get("unit_cost", 0)),
-                                          site_code=m.get("site"))
-            applied += created
-            skipped += not created
+    applied, skipped = sync.apply_remote_moves(_body(request).get("moves", []))
     return JsonResponse({"applied": applied, "already_had": skipped})

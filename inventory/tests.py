@@ -254,3 +254,106 @@ class Screens(Base):
         self.client.logout()
         self.assertEqual(self.client.get("/inventory/").status_code, 302)
         self.assertEqual(self.client.get("/inventory/lookup/?code=T1").status_code, 302)
+
+
+class Roles(Base):
+    def setUp(self):
+        super().setUp()
+        U = get_user_model()
+        U.objects.create_user("viewer", password="pw")
+        k = U.objects.create_user("keeper", password="pw")
+        from django.contrib.auth.models import Group
+        k.groups.add(Group.objects.get(name="Storekeeper"))
+        self.receive(5)
+
+    def login(self, name):
+        self.client.logout()
+        self.client.login(username=name, password="pw")
+
+    def test_viewer_can_look_but_not_change(self):
+        self.login("viewer")
+        self.assertEqual(self.client.get("/inventory/products/").status_code, 200)
+        self.assertEqual(self.client.get("/inventory/operations/receipts/new/").status_code, 302)
+        pk = Picking.objects.create(op_type=OperationType.objects.get(code="receipt"), source=self.vend, dest=self.stock)
+        stock.new_picking  # noqa
+        self.client.post(f"/inventory/transfer/{pk.pk}/validate/")
+        self.assertEqual(Picking.objects.get(pk=pk.pk).state, Picking.DRAFT)
+        r = self.client.post(f"/inventory/products/{self.p.pk}/", {"name": "Hacked", "internal_ref": "T1"})
+        self.assertEqual(r.status_code, 302)
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.name, "Tyre")
+        r = self.client.post("/inventory/physical-inventory/", {"location": self.stock.pk, f"count_{self.p.pk}": "99"})
+        self.assertEqual(self.p.on_hand, 5)
+
+    def test_storekeeper_can_operate_but_not_configure(self):
+        self.login("keeper")
+        pk = Picking.objects.create(op_type=OperationType.objects.get(code="receipt"), source=self.vend, dest=self.stock)
+        from .models import PickingLine
+        PickingLine.objects.create(picking=pk, product=self.p, qty=3)
+        self.client.post(f"/inventory/transfer/{pk.pk}/validate/")
+        self.assertEqual(self.p.on_hand, 8)
+        self.assertEqual(self.client.get("/inventory/config/zra/").status_code, 302)
+
+
+class SiteSync(Base):
+    def peer(self):
+        from .models import SyncPeer
+        return SyncPeer.objects.create(name="HQ", url="http://hq.test", token="k")
+
+    def test_catalogue_and_moves_are_exchanged(self):
+        import uuid as _uuid
+        from .services import sync
+        move = {"uuid": str(_uuid.uuid4()), "ref": "NEW1", "source": "Vendors", "dest": "SHOP/Stock", "qty": "5",
+                "unit_cost": "0", "date": "2026-11-13T10:00:00+02:00", "reason": "Receipt", "site": "HQ1",
+                "recorded_at": "2026-11-13T10:00:01+02:00"}
+        product = {"ref": "NEW1", "name": "From HQ", "barcode": "", "price": "10.00", "secondary_price": "11.00",
+                   "tax_type": "A", "type": "goods", "active": True, "cost": "5.00", "min_qty": "0", "max_qty": "0",
+                   "uom": "Units", "zra_item_class_code": "5059690800", "zra_item_type": "2", "category": "Tyres"}
+        sent = []
+
+        def fake(method, url, token, body=None):
+            if "/products/" in url:
+                return {"products": [product]}
+            if method == "GET":
+                return {"moves": [move]} if "since" not in url else {"moves": []}
+            sent.append(body)
+            return {"applied": len(body["moves"])}
+
+        self.receive(2)  # a local move to push
+        peer = self.peer()
+        with mock.patch.object(sync, "_http", fake):
+            ok, msg = sync.sync_peer(peer)
+            self.assertTrue(ok, msg)
+            self.assertEqual(Product.objects.get(internal_ref="NEW1").on_hand, 5)
+            self.assertEqual(len(sent[0]["moves"]), 1)
+            ok, msg = sync.sync_peer(peer)  # second run: nothing new, nothing doubled
+        self.assertTrue(ok, msg)
+        self.assertEqual(Product.objects.get(internal_ref="NEW1").on_hand, 5)
+        self.assertEqual(len(sent), 1)
+
+    def test_failure_is_reported_and_keeps_progress(self):
+        from .services import sync
+        peer = self.peer()
+        with mock.patch.object(sync, "_http", side_effect=sync.SyncError("Could not reach http://hq.test")):
+            ok, msg = sync.sync_peer(peer)
+        self.assertFalse(ok)
+        peer.refresh_from_db()
+        self.assertTrue(peer.last_result.startswith("FAILED"))
+
+    def test_unknown_product_in_moves_fails_whole_batch(self):
+        from .services import sync
+        bad = {"uuid": "6f1f7b43-2e2a-4f4f-8d77-1d3a6a0e8b11", "ref": "GHOST", "source": "Vendors", "dest": "SHOP/Stock",
+               "qty": "1", "date": "2026-11-13T10:00:00+02:00"}
+        with self.assertRaises(Product.DoesNotExist):
+            sync.apply_remote_moves([bad])
+        self.assertEqual(StockMove.objects.count(), 0)
+
+
+class HomeNotice(Base):
+    def test_low_stock_notice_and_screen_loads(self):
+        self.p.min_qty = 5
+        self.p.save()
+        u = get_user_model().objects.create_user("x", password="pw")
+        self.client.login(username="x", password="pw")
+        r = self.client.get("/")
+        self.assertContains(r, "below their reorder minimum")
