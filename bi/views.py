@@ -178,7 +178,7 @@ def insights_view(request):
     hist, future = insights.forecast()
     return render(request, "bi/insights.html", {
         "title": "Insights", "tab": "insights", "reorder": insights.reorder_suggestions(), "dead": insights.dead_stock(),
-        "flags": insights.anomalies(), "ai_on": bool(settings.AI_API_KEY), "lead": insights.LEAD_DAYS, "target": insights.TARGET_DAYS,
+        "flags": insights.anomalies(), "ai_on": bool(settings.AI_API_KEY), "examples": __import__("bi.ask_local", fromlist=["EXAMPLES"]).EXAMPLES, "lead": insights.LEAD_DAYS, "target": insights.TARGET_DAYS,
         "chart": {"hist": [[d.isoformat(), float(v)] for d, v in hist], "future": [[d.isoformat(), float(v)] for d, v in future]},
         "forecast_total": sum((v for _, v in future), ZERO)})
 
@@ -187,6 +187,7 @@ def insights_view(request):
 @require_POST
 def ask_view(request):
     import json
+    from . import ask_local
     if not request.user.is_staff:
         return JsonResponse({"error": "Managers only."}, status=403)
     try:
@@ -195,10 +196,16 @@ def ask_view(request):
         q = ""
     if not q:
         return JsonResponse({"error": "Type a question first."}, status=400)
-    try:
-        return JsonResponse({"answer": insights.ask(q)})
-    except insights.AiError as e:
-        return JsonResponse({"error": str(e)}, status=503)
+    res = ask_local.answer(q)
+    if res:
+        return JsonResponse({**res, "source": "database"})
+    if settings.AI_API_KEY:
+        try:
+            return JsonResponse({"answer": insights.ask(q), "table": None, "source": "ai"})
+        except insights.AiError as e:
+            return JsonResponse({"error": str(e)}, status=503)
+    return JsonResponse({"error": "I could not match that to a question I can answer from your data. Try one of the examples below.",
+                         "examples": ask_local.EXAMPLES}, status=200)
 
 
 @login_required

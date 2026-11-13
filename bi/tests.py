@@ -67,14 +67,32 @@ class InsightTests(PosBase):
         services.close_session(self.session, 10, self.cashier)   # float was 100, so 90 short
         self.assertTrue(any("short" in f for f in insights.anomalies()))
 
-    def test_ai_box_off_without_key_and_sends_only_totals_when_on(self):
+    def ask(self, q):
+        import json
+        return self.client.post("/bi/ask/", json.dumps({"question": q}), content_type="application/json").json()
+
+    def test_questions_are_answered_from_the_database_without_a_key(self):
+        self.sell(3, pay=[{"method": "cash", "amount": 300}])
+        a = self.ask("sales today")
+        self.assertIn("300.00", a["answer"])
+        self.assertEqual(a["source"], "database")
+        a = self.ask("how many tyre do we have")
+        self.assertEqual(a["table"]["rows"][0][2], "7")
+        self.assertEqual(self.ask("price of tyre")["table"]["rows"][0][2], "100.00")
+        self.assertEqual(self.ask("top products this month")["table"]["rows"][0][1], "Tyre")
+        self.assertEqual(self.ask("sales by cashier")["table"]["rows"][0][0], "till1")
+        self.assertIn("stock", self.ask("stock value")["answer"].lower())
+        for q in ["refunds this week", "payment methods today", "forecast next week", "dead stock", "what should I reorder", "out of stock", "cash short last week", "zra status"]:
+            self.assertNotIn("error", self.ask(q), q)
+
+    def test_unknown_question_gets_help_and_ai_is_only_a_fallback(self):
         from unittest import mock
         from django.test import override_settings
-        r = self.client.post("/bi/ask/", '{"question":"hi"}', content_type="application/json")
-        self.assertEqual(r.status_code, 503)
+        r = self.ask("qwertyuiop zzzz")
+        self.assertIn("error", r)
+        self.assertTrue(r["examples"])
         with override_settings(AI_API_KEY="k"), mock.patch("urllib.request.urlopen") as u:
             u.return_value.__enter__.return_value.read.return_value = b'{"content":[{"type":"text","text":"Stock tyres."}]}'
-            r = self.client.post("/bi/ask/", '{"question":"what next?"}', content_type="application/json")
-            self.assertEqual(r.json()["answer"], "Stock tyres.")
-            sent = u.call_args[0][0].data.decode()
-            self.assertNotIn("till1", sent)
+            self.assertEqual(self.ask("qwertyuiop zzzz")["answer"], "Stock tyres.")
+            self.assertNotIn("till1", u.call_args[0][0].data.decode())
+            self.assertEqual(self.ask("sales today")["source"], "database")  # local answer wins, nothing sent
