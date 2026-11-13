@@ -153,3 +153,7 @@ HOME_NOTICE = os.environ.get("ALIFARIS_HOME_NOTICE", "")
 POS_PRICES_INCLUDE_TAX = os.environ.get("ALIFARIS_PRICES_INCLUDE_TAX", "1") == "1"  # shelf prices already contain VAT
 POS_MAX_DISCOUNT_CASHIER = int(os.environ.get("ALIFARIS_MAX_CASHIER_DISCOUNT", "10"))  # percent; managers are not limited
 POS_TAX_RATES = {"A": 16, "B": 16, "C1": 0, "C2": 0, "C3": 0, "D": 0}
+
+# Optional "Ask your data" box on the Insights page. Leave the key empty to keep it switched off.
+AI_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+AI_MODEL = os.environ.get("ALIFARIS_AI_MODEL", "claude-sonnet-5-5")

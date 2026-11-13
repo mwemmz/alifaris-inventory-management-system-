@@ -32,3 +32,49 @@ class BiTests(PosBase):
     def test_managers_only(self):
         self.client.login(username="till1", password="x")
         self.assertEqual(self.client.get("/bi/").status_code, 302)
+
+
+class InsightTests(PosBase):
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="boss", password="x")
+
+    def test_fast_seller_is_flagged_for_reorder_and_draft_created(self):
+        from . import insights
+        from inventory.models import Picking
+        self.sell(8, pay=[{"method": "cash", "amount": 800}])         # 2 left, sold 8 in 30 days
+        rows = insights.reorder_suggestions()
+        self.assertEqual(rows[0]["p"], self.p)
+        self.assertGreater(rows[0]["qty"], 0)
+        before = self.p.on_hand
+        r = self.client.post("/bi/draft-order/", {"pick": [self.p.pk]})
+        self.assertEqual(r.status_code, 302)
+        pk = Picking.objects.get(origin="Auto reorder")
+        self.assertEqual(pk.state, Picking.DRAFT)
+        self.assertEqual(self.p.on_hand, before)  # nothing moves until validated
+
+    def test_pages_render_and_forecast_has_seven_days(self):
+        from . import insights
+        self.sell(1, pay=[{"method": "cash", "amount": 100}])
+        hist, future = insights.forecast()
+        self.assertEqual(len(future), 7)
+        for u in ["/bi/insights/", "/bi/", "/bi/stock/"]:
+            self.assertEqual(self.client.get(u).status_code, 200, u)
+
+    def test_cash_shortage_is_flagged(self):
+        from . import insights
+        from pos import services
+        services.close_session(self.session, 10, self.cashier)   # float was 100, so 90 short
+        self.assertTrue(any("short" in f for f in insights.anomalies()))
+
+    def test_ai_box_off_without_key_and_sends_only_totals_when_on(self):
+        from unittest import mock
+        from django.test import override_settings
+        r = self.client.post("/bi/ask/", '{"question":"hi"}', content_type="application/json")
+        self.assertEqual(r.status_code, 503)
+        with override_settings(AI_API_KEY="k"), mock.patch("urllib.request.urlopen") as u:
+            u.return_value.__enter__.return_value.read.return_value = b'{"content":[{"type":"text","text":"Stock tyres."}]}'
+            r = self.client.post("/bi/ask/", '{"question":"what next?"}', content_type="application/json")
+            self.assertEqual(r.json()["answer"], "Stock tyres.")
+            sent = u.call_args[0][0].data.decode()
+            self.assertNotIn("till1", sent)

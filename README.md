@@ -111,3 +111,9 @@ the Inventory screens read, so on-hand is correct everywhere the moment a sale c
 - **Sales analysis:** filter by date range, department (category, including sub-categories), product name/ref/barcode, price range, cashier, site, customer, price tier and payment method; group time by day/week/month. Shows sales incl./excl. VAT, estimated margin, orders, average order, units, plus breakdowns by department, product, cashier and site, with CSV export.
 - **Stock analysis:** stock value at cost and at selling price by department, filter by category/product/price, low-stock and out-of-stock views, CSV export.
 - Margin uses each product's current cost (sale lines do not store cost yet), so treat it as an estimate.
+
+### Charts and automatic insights (`/bi/insights/`)
+- Charts are drawn in the browser with a small bundled script, so they work offline.
+- **Reorder suggestions:** from the last 30 days' selling speed, lists products with under 14 days of stock and how much to order for 30 days. One click creates a **draft** receipt (nothing moves until validated).
+- **Slow stock**, a 7-day **sales forecast** (same weekday over the last 4 weeks), and **flags** for high refund or discount rates per cashier, cash-up differences and ZRA failures.
+- **Ask your data** (optional): set `ANTHROPIC_API_KEY` (and optionally `ALIFARIS_AI_MODEL`) to let managers ask questions in plain English. Only aggregate totals are sent. Untested against the live API; unit-tested with a mocked response.

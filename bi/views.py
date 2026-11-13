@@ -5,11 +5,16 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
-from django.http import HttpResponse
+from django.contrib import messages
+from django.conf import settings
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from inventory.models import Product, ProductCategory
 from inventory.services import stock
+from . import insights
+from inventory.models import OperationType, Location
 from pos.models import PosOrder, PosOrderLine
 
 ZERO = Decimal("0")
@@ -108,9 +113,13 @@ def sales(request):
             w.writerow([r["ref"], r["name"], r["units"], r["total"], r["tax"], r["cost"], r["margin"]])
         return resp
 
+    by_category = grouped("product__category__name")
     ctx = {"title": "Sales analysis", "g": g, "d_from": d_from, "d_to": d_to, "kpi": kpi, "series": series,
-           "by_category": grouped("product__category__name"), "by_product": by_product,
+           "by_category": by_category, "by_product": by_product,
            "by_cashier": grouped("order__cashier_name"), "by_site": grouped("order__site_code"),
+           "chart": {"series": [[(r["d"].strftime("%Y-%m-%d") if r["d"] else ""), float(r["total"])] for r in series],
+                     "cats": [[r["product__category__name"] or "Uncategorised", float(r["total"])] for r in by_category[:8]],
+                     "products": [[r["name"], float(r["total"])] for r in by_product[:10]]},
            "categories": ProductCategory.objects.all(),
            "cashiers": PosOrder.objects.order_by().values_list("cashier_name", flat=True).distinct(),
            "sites": PosOrder.objects.order_by().values_list("site_code", flat=True).distinct(), "tab": "sales"}
@@ -157,5 +166,54 @@ def stock_view(request):
     return render(request, "bi/stock.html", {
         "title": "Stock analysis", "g": g, "tab": "stock", "rows": rows[:200], "count": len(rows),
         "by_category": _bars(sorted(cats.values(), key=lambda c: -c["total"])),
+        "chart": {"cats": [[c["name"], float(c["total"])] for c in sorted(cats.values(), key=lambda c: -c["total"])[:8]]},
         "value": sum((r["value"] for r in rows), ZERO), "retail": sum((r["retail"] for r in rows), ZERO),
         "categories": ProductCategory.objects.all()})
+
+
+@login_required
+def insights_view(request):
+    if not request.user.is_staff:
+        return redirect("/")
+    hist, future = insights.forecast()
+    return render(request, "bi/insights.html", {
+        "title": "Insights", "tab": "insights", "reorder": insights.reorder_suggestions(), "dead": insights.dead_stock(),
+        "flags": insights.anomalies(), "ai_on": bool(settings.AI_API_KEY), "lead": insights.LEAD_DAYS, "target": insights.TARGET_DAYS,
+        "chart": {"hist": [[d.isoformat(), float(v)] for d, v in hist], "future": [[d.isoformat(), float(v)] for d, v in future]},
+        "forecast_total": sum((v for _, v in future), ZERO)})
+
+
+@login_required
+@require_POST
+def ask_view(request):
+    import json
+    if not request.user.is_staff:
+        return JsonResponse({"error": "Managers only."}, status=403)
+    try:
+        q = json.loads(request.body).get("question", "").strip()
+    except ValueError:
+        q = ""
+    if not q:
+        return JsonResponse({"error": "Type a question first."}, status=400)
+    try:
+        return JsonResponse({"answer": insights.ask(q)})
+    except insights.AiError as e:
+        return JsonResponse({"error": str(e)}, status=503)
+
+
+@login_required
+@require_POST
+def draft_order(request):
+    """Turn the reorder suggestions into one DRAFT receipt. Nothing moves until someone validates it."""
+    if not request.user.is_staff:
+        return redirect("/")
+    from inventory.services import stock
+    chosen = set(request.POST.getlist("pick"))
+    lines = [(r["p"], r["qty"], r["p"].cost) for r in insights.reorder_suggestions() if str(r["p"].pk) in chosen and r["qty"] > 0]
+    if not lines:
+        messages.error(request, "Tick at least one product to order.")
+        return redirect("bi:insights")
+    op = OperationType.objects.filter(code=OperationType.RECEIPT).first()
+    picking = stock.new_picking(op, lines, origin="Auto reorder", user=request.user, notes="Created from BI reorder suggestions")
+    messages.success(request, f"Draft receipt {picking.ref} created with {len(lines)} product(s). Review it, then validate when the goods arrive.")
+    return redirect("inventory:picking_detail", pk=picking.pk)

@@ -24,7 +24,10 @@
  <div class="card"><b>{{ kpi.units|floatformat:"-0" }}</b><br>Units sold</div>
 </div>
 <p><small>Margin uses each product's <i>current</i> cost, so it is an estimate. Refunds count as negative sales. Filters on product, price or category analyse those lines only.</small></p>
-<div class="card"><h3>Sales over time</h3><table class="t">{% for r in series %}<tr><td>{{ r.d|date:"d M Y" }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% empty %}<tr><td>No sales match these filters.</td></tr>{% endfor %}</table></div>
+<div class="card"><h3>Sales over time</h3><div id="c-line"></div></div>
+<div class="grid2"><div class="card"><h3>Share by department</h3><div id="c-donut"></div></div><div class="card"><h3>Top 10 products</h3><div id="c-bar"></div></div></div>
+{{ chart|json_script:"chartdata" }}
+<script>var D=JSON.parse(document.getElementById('chartdata').textContent);lineChart(document.getElementById('c-line'),D.series);donutChart(document.getElementById('c-donut'),D.cats);barChart(document.getElementById('c-bar'),D.products);</script>
 <div class="grid2">
 <div class="card"><h3>By department / category</h3><table class="t">{% for r in by_category %}<tr><td>{{ r.product__category__name|default:"Uncategorised" }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td><td class="r">{{ r.margin|floatformat:0 }}</td></tr>{% endfor %}</table><small>Columns: sales, est. margin</small></div>
 <div class="card"><h3>By cashier</h3><table class="t">{% for r in by_cashier %}<tr><td>{{ r.order__cashier_name }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% endfor %}</table>

@@ -1,0 +1,23 @@
+{% extends "bi/base.html" %}
+{% block page %}
+<h2>Insights <small>worked out automatically from your sales</small></h2>
+{% if flags %}<div class="card"><h3>Worth a look</h3><ul>{% for f in flags %}<li>{{ f }}</li>{% endfor %}</ul><small>These are prompts to check, not proof of anything wrong.</small></div>{% endif %}
+<div class="card"><h3>Sales forecast <small>next 7 days ≈ {{ forecast_total|floatformat:0 }}</small></h3><div id="c-line"></div>
+<small>Orange dashes: expected sales, based on the same weekday over the last 4 weeks.</small></div>
+{{ chart|json_script:"chartdata" }}
+<script>var D=JSON.parse(document.getElementById('chartdata').textContent);lineChart(document.getElementById('c-line'),D.hist,D.future);</script>
+<form method="post" action="{% url 'bi:draft_order' %}" class="card">{% csrf_token %}
+<h3>Reorder suggestions <small>stock covers under {{ lead }} days at the last 30 days' selling speed; order enough for {{ target }} days</small></h3>
+<table class="t"><tr><th></th><th>Product</th><th class="r">On hand</th><th class="r">Sells / day</th><th class="r">Days left</th><th class="r">Order</th><th class="r">Est. cost</th></tr>
+{% for r in reorder %}<tr><td><input type="checkbox" name="pick" value="{{ r.p.pk }}" checked style="width:auto"></td><td>{{ r.p.internal_ref }} {{ r.p.name }}</td><td class="r">{{ r.on_hand|floatformat:"-3" }}</td><td class="r">{{ r.per_day|floatformat:2 }}</td><td class="r {% if r.cover < 3 %}neg{% endif %}">{{ r.cover|floatformat:1 }}</td><td class="r">{{ r.qty|floatformat:0 }}</td><td class="r">{{ r.cost|floatformat:2 }}</td></tr>
+{% empty %}<tr><td colspan="7">Nothing is running low.</td></tr>{% endfor %}</table>
+{% if reorder %}<p><button class="btn primary">Create draft receipt for ticked items</button> <small>Creates a draft only. Stock changes when you validate it.</small></p>{% endif %}</form>
+<div class="card"><h3>Slow stock <small>on the shelf, nothing sold in 60 days</small></h3>
+<table class="t"><tr><th>Product</th><th class="r">On hand</th><th class="r">Tied up (cost)</th></tr>{% for r in dead %}<tr><td>{{ r.p.internal_ref }} {{ r.p.name }}</td><td class="r">{{ r.on_hand|floatformat:"-3" }}</td><td class="r">{{ r.value|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">None.</td></tr>{% endfor %}</table></div>
+<div class="card"><h3>Ask your data</h3>
+{% if ai_on %}<p><small>Sends only totals (sales, top products, low stock, flags, forecast) to the Claude API. No customer names or receipts.</small></p>
+<div style="display:flex;gap:8px"><input id="askq" placeholder="e.g. Which departments should I stock up on before month end?"><button class="btn primary" id="askb">Ask</button></div><pre id="aska" style="white-space:pre-wrap;font:inherit;margin-top:10px"></pre>
+<script>document.getElementById('askb').onclick=function(){var a=document.getElementById('aska');a.textContent='Thinking...';var c=document.cookie.match(/csrftoken=([^;]+)/);
+fetch('{% url "bi:ask" %}',{method:'POST',headers:{'X-CSRFToken':c?c[1]:''},body:JSON.stringify({question:document.getElementById('askq').value})}).then(function(r){return r.json()}).then(function(d){a.textContent=d.answer||d.error}).catch(function(){a.textContent='Could not reach the server.'})}</script>
+{% else %}<p>Switched off. To use it, set the <code>ANTHROPIC_API_KEY</code> environment variable on the server and restart. Everything else on this page works without it.</p>{% endif %}</div>
+{% endblock %}
