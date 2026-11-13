@@ -1,0 +1,39 @@
+/* Alifaris Auto Spares brand layer: charcoal, logo red, logo grey. Loaded last so it wins. */
+:root{--red:#d4202c;--red-dark:#a8151f;--char:#24272b;--char-2:#16181b;--grey:#a5a7a6;--paper:#f2f3f3;--plum:#d4202c;--teal:#d4202c}
+body.inv,body.pos{background:var(--paper)}
+.barlogo{height:32px;width:auto;border-radius:4px;margin:0 10px 0 4px;display:block}
+/* bars */
+.invbar,.posbar{background:var(--char);border-bottom:3px solid var(--red);color:#fff}
+.invbar{height:50px}
+.invbar .apps,.posbar .apps{color:#fff}
+.invbar .brand,.posbar .brand{color:#fff;letter-spacing:.3px}
+.menus>a,.dd>button,.posbar nav a{color:#d9dbdd}
+.menus>a:hover,.dd>button:hover,.dd.open>button{background:rgba(255,255,255,.12);color:#fff}
+.invbar .site{background:rgba(212,32,44,.22);color:#ffd9dc}
+.invbar .company,.invbar .icon-btn,.posbar .who{color:#d9dbdd}
+.dd-menu a:hover{background:#fbeeee}
+.posbar nav a:hover{color:#fff;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:6px}
+/* buttons */
+.btn.primary,.btn{border-radius:5px}
+.btn.primary{background:var(--red);border-color:var(--red)}.btn.primary:hover{background:var(--red-dark)}
+.btn.danger{background:var(--char);border-color:var(--char)}
+a{color:var(--red-dark)}
+/* launcher (app grid) */
+body.launcher{background:radial-gradient(900px 420px at 50% -80px,rgba(212,32,44,.32),transparent 70%),linear-gradient(165deg,#2c2f34 0%,#1b1d20 100%);color:#e9eaeb}
+.launcher .topbar-menu,.launcher .icon-btn,.launcher .company{color:#e9eaeb}
+.avatar{background:var(--red)!important}
+.launcher .tile{color:#e3e4e5}
+.launcher .tile-icon{box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.launcher .tile:hover .tile-icon{box-shadow:0 8px 18px rgba(0,0,0,.55),0 0 0 2px var(--red)}
+.hero{text-align:center;margin:6px auto 34px}
+.hero img{width:min(360px,80vw);height:auto;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.hero p{margin:12px 0 0;color:#a9acb0;font-size:13px;letter-spacing:2px;text-transform:uppercase}
+.notice{background:#3a2a2c;border-color:#5a3438;color:#f3d6d8}.notice-x{color:#f3d6d8}
+/* login */
+body.login{display:flex;align-items:center;justify-content:center}
+.login-box{margin:0 auto;max-width:380px;width:92vw;padding:0;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.login-box .plate{background:var(--grey);padding:18px 18px 14px;border-bottom:4px solid var(--red)}.login-box .plate img{width:100%;display:block}
+.login-box form{padding:10px 26px 26px}
+.login-box h1{font-size:15px;color:var(--char);letter-spacing:1.5px;text-transform:uppercase;padding:18px 26px 4px;margin:0}
+.login-box .btn{width:100%;background:var(--red)}.login-box .btn:hover{background:var(--red-dark)}
+.login-box input:focus{outline:2px solid #e8a3a8;border-color:var(--red)}

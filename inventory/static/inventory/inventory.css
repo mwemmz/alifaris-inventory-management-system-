@@ -1,6 +1,6 @@
 body.inv{background:#f9fafb}
 .invbar{display:flex;align-items:center;gap:4px;height:46px;padding:0 14px;background:#fff;border-bottom:1px solid #dee2e6;position:sticky;top:0;z-index:20}
-.invbar .apps{color:#714b67;display:flex;padding:6px;margin-right:2px}
+.invbar .apps{color:#d4202c;display:flex;padding:6px;margin-right:2px}
 .invbar .brand{font-weight:600;color:#212529;text-decoration:none;font-size:17px;margin-right:12px}
 .menus{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
 .menus>a,.dd>button{color:#495057;text-decoration:none;font-size:14.5px;padding:6px 10px;border-radius:4px;background:none;border:1px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit}
@@ -12,7 +12,7 @@ body.inv{background:#f9fafb}
 .dd-menu a{display:block;padding:6px 26px;color:#212529;text-decoration:none;font-size:14px}
 .dd-menu a:hover{background:#f1f3f5}
 .invbar .topbar-right{margin-left:auto;gap:12px}
-.invbar .site{background:#e9e4ee;color:#714b67;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:600}
+.invbar .site{background:#f6dcde;color:#d4202c;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:600}
 .invbar .company{font-size:13px}
 .msgs{max-width:1200px;margin:10px auto 0;padding:0 16px}
 .msg{padding:10px 14px;border-radius:4px;margin:6px 0;background:#d1ecf1;color:#0c5460;font-size:14px}
@@ -20,21 +20,21 @@ body.inv{background:#f9fafb}
 .invmain{max-width:1200px;margin:0 auto;padding:14px 16px 60px}
 .cp{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .cp h1{font-size:19px;font-weight:500;margin:0;margin-right:auto}
-.btn{display:inline-block;padding:7px 16px;border:1px solid #714b67;border-radius:4px;background:#714b67;color:#fff;text-decoration:none;cursor:pointer;font-size:14px;font-family:inherit}
-.btn:hover{background:#5d3d55}.btn.ghost{background:#fff;color:#714b67}.btn.ghost:hover{background:#f4eff3}
+.btn{display:inline-block;padding:7px 16px;border:1px solid #d4202c;border-radius:4px;background:#d4202c;color:#fff;text-decoration:none;cursor:pointer;font-size:14px;font-family:inherit}
+.btn:hover{background:#a8151f}.btn.ghost{background:#fff;color:#d4202c}.btn.ghost:hover{background:#fbeeee}
 form.inline{display:inline}
 .search{display:flex;gap:6px}
 input,select,textarea{font:inherit;font-size:14px;padding:6px 9px;border:1px solid #ced4da;border-radius:4px;background:#fff;max-width:100%}
 .search input{min-width:260px}
-input:focus,select:focus,textarea:focus{outline:2px solid #c9b3c3;border-color:#714b67}
+input:focus,select:focus,textarea:focus{outline:2px solid #e8a3a8;border-color:#d4202c}
 .narrow{width:110px}
 .pager{color:#495057;font-size:13px;display:flex;gap:10px;align-items:center}
 .pager a,.views a{color:#495057;text-decoration:none;padding:2px 9px;border:1px solid #ced4da;border-radius:4px;background:#fff;font-size:16px}
-.views{display:flex}.views a.on{background:#714b67;color:#fff;border-color:#714b67}
+.views{display:flex}.views a.on{background:#d4202c;color:#fff;border-color:#d4202c}
 .note{color:#6c757d;font-size:13px;margin:6px 0 10px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
 .card{background:#fff;border:1px solid #dee2e6;border-radius:4px;padding:16px}
-.card h2{margin:0;color:#017e84;font-size:18px;font-weight:500}.card .sub{color:#6c757d;font-size:13px;margin-bottom:14px}
+.card h2{margin:0;color:#d4202c;font-size:18px;font-weight:500}.card .sub{color:#6c757d;font-size:13px;margin-bottom:14px}
 .stats{display:flex;gap:30px;margin:6px 0 14px}.stats b{display:block;font-size:26px;font-weight:500}.stats span{font-size:12px;color:#6c757d}
 .stats.bar{background:#fff;border:1px solid #dee2e6;border-radius:4px;padding:10px 16px;margin-bottom:10px}
 table.list{width:100%;border-collapse:collapse;background:#fff;border:1px solid #dee2e6;font-size:14px}
@@ -46,8 +46,8 @@ table.list tr.error td{color:#b02a37}table.list tr.success td{color:#198754}
 td.zero{color:#b02a37}.empty{text-align:center;color:#6c757d;padding:24px}
 .kanban{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .kcard{display:flex;justify-content:space-between;gap:8px;background:#fff;border:1px solid #dee2e6;border-radius:3px;padding:10px 12px;text-decoration:none;color:#212529;min-height:114px}
-.kcard:hover{border-color:#714b67;box-shadow:0 2px 8px rgba(113,75,103,.18)}
-.ktxt{display:flex;flex-direction:column;gap:2px;font-size:13.5px}.ktxt b{font-size:15px;font-weight:500;margin-bottom:1px}.ktxt .ref{color:#017e84}
+.kcard:hover{border-color:#d4202c;box-shadow:0 2px 8px rgba(212,32,44,.18)}
+.ktxt{display:flex;flex-direction:column;gap:2px;font-size:13.5px}.ktxt b{font-size:15px;font-weight:500;margin-bottom:1px}.ktxt .ref{color:#d4202c}
 .kcard img{width:58px;height:70px;object-fit:contain;align-self:flex-start}
 .sheet{background:#fff;border:1px solid #dee2e6;border-radius:4px;padding:16px;margin-bottom:14px}
 .sheet h3{margin:14px 0 8px;font-size:16px}

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{% static 'pos/pos.css' %}">
 <header class="posbar">
   <a class="apps" href="/" title="Apps" aria-label="Apps"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="currentColor"/></svg></a>
-  <a class="brand" href="{% url 'pos:terminal' %}">Point of Sale</a>
+  <a href="/" aria-label="Home"><img class="barlogo" src="{% static 'launcher/brand/logo-640.png' %}" alt="Alifaris"></a><a class="brand" href="{% url 'pos:terminal' %}">Point of Sale</a>
   <nav>
     <a href="{% url 'pos:terminal' %}">Till</a>
     <a href="{% url 'pos:order_list' %}">Orders</a>

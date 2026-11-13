@@ -1,9 +1,11 @@
 {% extends "launcher/base.html" %}
+{% load static %}
 {% block title %}Log in - Alifaris ERP{% endblock %}
 {% block bodyclass %}launcher login{% endblock %}
 {% block content %}
 <main class="login-box">
-  <h1>Alifaris ERP</h1>
+  <div class="plate"><img src="{% static 'launcher/brand/logo-640.png' %}" alt="Alifaris Auto Spare"></div>
+  <h1>Sign in</h1>
   <form method="post">
     {% csrf_token %}
     {% if form.errors %}<p class="err">Wrong username or password.</p>{% endif %}

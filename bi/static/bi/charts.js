@@ -1,6 +1,6 @@
 // Small dependency-free SVG charts, so they work offline on the shop server.
 (function () {
-  var NS = 'http://www.w3.org/2000/svg', COLORS = ['#017e84', '#714b67', '#e8913a', '#2f8df5', '#c0392b', '#7f8c8d', '#27ae60', '#8e44ad'];
+  var NS = 'http://www.w3.org/2000/svg', COLORS = ['#d4202c', '#24272b', '#e8913a', '#7b8087', '#c0392b', '#7f8c8d', '#27ae60', '#9aa0a6'];
   function el(n, a, parent) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (parent) parent.appendChild(e); return e; }
   function fmt(n) { return Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.abs(n) >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : Math.round(n); }
   function svg(box, w, h) { box.innerHTML = ''; return el('svg', {viewBox: '0 0 ' + w + ' ' + h, width: '100%', role: 'img'}, box); }
@@ -17,8 +17,8 @@
       el('line', {x1: L, x2: W - 8, y1: y(gv), y2: y(gv), stroke: '#e5e7eb'}, s);
       el('text', {x: L - 6, y: y(gv) + 4, 'text-anchor': 'end', 'font-size': 11, fill: '#6b7280'}, s).textContent = fmt(gv); }
     var d = points.map(function (p, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(p[1]); }).join(' ');
-    el('path', {d: d + ' L' + x(points.length - 1) + ' ' + y(0) + ' L' + x(0) + ' ' + y(0) + 'Z', fill: '#017e8422'}, s);
-    el('path', {d: d, fill: 'none', stroke: '#017e84', 'stroke-width': 2.5}, s);
+    el('path', {d: d + ' L' + x(points.length - 1) + ' ' + y(0) + ' L' + x(0) + ' ' + y(0) + 'Z', fill: '#d4202c22'}, s);
+    el('path', {d: d, fill: 'none', stroke: '#d4202c', 'stroke-width': 2.5}, s);
     if (future && future.length) {
       var f = [points[points.length - 1]].concat(future).map(function (p, i) { var k = points.length - 1 + i; return (i ? 'L' : 'M') + x(k) + ' ' + y(p[1]); }).join(' ');
       el('path', {d: f, fill: 'none', stroke: '#e8913a', 'stroke-width': 2.5, 'stroke-dasharray': '6 4'}, s);
@@ -26,7 +26,7 @@
     var step = Math.ceil(all.length / 8);
     all.forEach(function (p, i) {
       if (i % step === 0) el('text', {x: x(i), y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: '#6b7280'}, s).textContent = p[0].slice(5);
-      if (all.length <= 40) el('circle', {cx: x(i), cy: y(p[1]), r: 3, fill: i >= points.length ? '#e8913a' : '#017e84'}, s);
+      if (all.length <= 40) el('circle', {cx: x(i), cy: y(p[1]), r: 3, fill: i >= points.length ? '#e8913a' : '#d4202c'}, s);
       var c = el('circle', {cx: x(i), cy: y(p[1]), r: 8, fill: 'transparent'}, s);
       c.addEventListener('mouseenter', function () { t.style.display = 'block'; t.textContent = p[0] + (i >= points.length ? ' (forecast)' : '') + ': ' + Math.round(p[1]).toLocaleString();
         t.style.left = (x(i) / W * box.clientWidth + 8) + 'px'; t.style.top = (y(p[1]) / H * box.clientHeight - 24) + 'px'; });
@@ -57,7 +57,7 @@
     rows.forEach(function (r, i) {
       var w = (W - 260) * r[1] / max;
       el('text', {x: 0, y: i * rowH + 18, 'font-size': 12, fill: '#1f2937'}, s).textContent = (r[0] || '').slice(0, 30);
-      var b = el('rect', {x: 210, y: i * rowH + 5, width: Math.max(w, 2), height: 16, rx: 3, fill: '#017e84'}, s);
+      var b = el('rect', {x: 210, y: i * rowH + 5, width: Math.max(w, 2), height: 16, rx: 3, fill: '#d4202c'}, s);
       el('title', {}, b).textContent = r[0] + ': ' + Math.round(r[1]).toLocaleString();
       el('text', {x: 216 + w, y: i * rowH + 18, 'font-size': 12, fill: '#6b7280'}, s).textContent = fmt(r[1]);
     });

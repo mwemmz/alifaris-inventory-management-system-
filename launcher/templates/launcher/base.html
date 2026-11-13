@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{% static 'launcher/brand/favicon.png' %}">
   <link rel="manifest" href="{% url 'manifest' %}">
-  <meta name="theme-color" content="#714b67">
+  <meta name="theme-color" content="#24272b">
   <link rel="apple-touch-icon" href="{% static 'launcher/icons/icon-192.png' %}">
   <title>{% block title %}Alifaris ERP{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'launcher/launcher.css' %}">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% block content %}{% endblock %}
+<link rel="stylesheet" href="{% static 'launcher/brand.css' %}">
 <script src="{% static 'launcher/launcher.js' %}"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});});}</script>
 </body>

@@ -38,7 +38,7 @@ function startServer() {
 }
 
 async function createWindow() {
-  const win = new BrowserWindow({ width: 1366, height: 768, title: isPos ? 'Alifaris POS' : 'Alifaris ERP', autoHideMenuBar: true,
+  const win = new BrowserWindow({ width: 1366, height: 768, title: isPos ? 'Alifaris POS' : 'Alifaris ERP', icon: require('path').join(__dirname, 'icon.png'), autoHideMenuBar: true,
                                   webPreferences: { contextIsolation: true } });
   // Receipts open in a new window. Print them straight to the printer when silent_print is on.
   win.webContents.setWindowOpenHandler(({ url }) => {

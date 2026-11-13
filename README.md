@@ -120,3 +120,6 @@ the Inventory screens read, so on-hand is correct everywhere the moment a sale c
 
 ### Manager dashboard (`/bi/`, the Dashboards tile)
 Sales today against yesterday and the same day last week, month to date against the same days last month, stock value, items to reorder, ZRA queue and site-sync status, 14-day and by-hour charts, tills open now, payment mix, top products today and flags. Refreshes every minute. Detailed analysis moved to `/bi/sales/`.
+
+## Branding
+Logo, charcoal/red/grey palette and icons live in `launcher/static/launcher/brand/` and `brand.css` (loaded last, so one file controls the look). PWA icons and the desktop window icon are made from the logo's "A" mark. The receipt is still plain black-and-white text for thermal printers.

@@ -52,7 +52,7 @@ def module(request, slug):
 def manifest(request):
     return JsonResponse({
         "name": "Alifaris ERP", "short_name": "Alifaris", "start_url": "/", "scope": "/",
-        "display": "standalone", "background_color": "#e9e7f1", "theme_color": "#714b67",
+        "display": "standalone", "background_color": "#24272b", "theme_color": "#24272b",
         "icons": [{"src": "/static/launcher/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
                   {"src": "/static/launcher/icons/icon-512.png", "sizes": "512x512", "type": "image/png"}],
     }, content_type="application/manifest+json")

@@ -1,8 +1,10 @@
 {% extends "launcher/base.html" %}
+{% load static %}
 {% block bodyclass %}launcher{% endblock %}
 {% block content %}
 {% include "launcher/topbar.html" %}
 <main class="home">
+  <div class="hero"><img src="{% static 'launcher/brand/logo-640.png' %}" alt="Alifaris Auto Spare"><p>Business suite</p></div>
   {% if notice %}
   <div class="notice" id="notice" role="status">
     <span>{{ notice }}</span>
