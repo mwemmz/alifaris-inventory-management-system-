@@ -1,0 +1,15 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Products / {{ product.name|default:"New" }}</h1>
+  {% if product and request.user.is_staff %}<form method="post" action="{% url 'inventory:product_zra' product.pk %}" class="inline">{% csrf_token %}<button class="btn ghost">Register with ZRA</button></form>{% endif %}
+</div>
+{% if product %}
+<div class="stats bar"><div><b>{{ on_hand }}</b><span>On hand</span></div><div><b>{% if product.zra_registered %}Yes{% else %}No{% endif %}</b><span>Registered with ZRA</span></div></div>
+{% if problems %}<div class="msg warning"><b>ZRA would reject this item:</b><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+{% endif %}
+<form method="post" enctype="multipart/form-data" class="sheet">{% csrf_token %}{{ form.non_field_errors }}
+  <div class="two">{% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}</div>
+  <button class="btn" type="submit">Save</button> <a class="btn ghost" href="{% url 'inventory:products' %}">Back</a>
+</form>
+{% if quants %}<div class="sheet"><h3>Stock by location</h3><table class="list"><tbody>{% for q in quants %}<tr><td>{{ q.location.full_name }}</td><td>{{ q.qty }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% endblock %}

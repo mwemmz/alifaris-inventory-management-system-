@@ -11,7 +11,7 @@
   {% endif %}
   <nav class="grid" aria-label="Applications">
     {% for t in tiles %}
-    <a class="tile" href="{% url 'module' t.slug %}">
+    <a class="tile" href="{{ t.url }}">
       <span class="tile-icon">{{ t.icon }}</span>
       <span class="tile-label">{{ t.label }}</span>
     </a>

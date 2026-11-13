@@ -1,0 +1,29 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Scan a product</h1></div>
+<div class="sheet">
+  <video id="cam" playsinline muted hidden class="cam"></video>
+  <div class="field"><label>Barcode or reference</label><input id="code" autofocus autocomplete="off" placeholder="Scan or type, then press Enter"></div>
+  <button class="btn ghost" id="startcam" type="button">Use camera</button>
+  <div id="result" class="scanres"></div>
+  <p class="note" id="camnote"></p>
+</div>
+<script>
+(function(){
+  var code=document.getElementById('code'),res=document.getElementById('result');
+  function look(v){v=v.trim();if(!v)return;
+    fetch("{% url 'inventory:lookup' %}?code="+encodeURIComponent(v),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+      if(!d.found){res.className='scanres bad';res.textContent='No product found for '+v;return}
+      res.className='scanres ok';res.innerHTML='';var a=document.createElement('a');a.href='/inventory/products/'+d.id+'/';a.textContent=d.name+' ['+d.ref+']';
+      res.appendChild(a);res.appendChild(document.createElement('br'));res.appendChild(document.createTextNode('Price '+d.price+' ZK. On hand: '+d.on_hand));
+    }).catch(function(){res.className='scanres bad';res.textContent='No connection. Try again when you are online.'});}
+  code.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();look(code.value);code.select();}});
+  document.getElementById('startcam').addEventListener('click',function(){
+    if(!('BarcodeDetector' in window)){document.getElementById('camnote').textContent='This browser cannot scan with the camera. Use a barcode scanner or type the code.';return}
+    var cam=document.getElementById('cam'),det=new BarcodeDetector();
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(s){cam.srcObject=s;cam.hidden=false;cam.play();
+      (function tick(){det.detect(cam).then(function(c){if(c.length){code.value=c[0].rawValue;look(code.value)}}).catch(function(){});setTimeout(tick,600)})();
+    }).catch(function(){document.getElementById('camnote').textContent='Camera permission was refused.'});});
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Physical Inventory</h1>
+  <form method="get" class="inline"><select name="location" onchange="this.form.submit()">{% for l in locations %}<option value="{{ l.pk }}" {% if l == loc %}selected{% endif %}>{{ l.full_name }}</option>{% endfor %}</select></form>
+</div>
+<p class="note">Type the quantity you counted. Leave a row empty to keep it as it is. Applying creates adjustment moves for every difference.</p>
+{% if loc %}
+<form method="post" class="sheet">{% csrf_token %}<input type="hidden" name="location" value="{{ loc.pk }}">
+<table class="list"><thead><tr><th>Ref</th><th>Product</th><th>On hand</th><th>Counted</th></tr></thead><tbody>
+{% for q in quants %}<tr><td>{{ q.product.internal_ref }}</td><td>{{ q.product.name }}</td><td>{{ q.qty }}</td><td><input type="number" step="any" name="count_{{ q.product_id }}" class="narrow"></td></tr>
+{% empty %}<tr><td colspan="4" class="empty">No stock in this location. Add a product below.</td></tr>{% endfor %}
+<tr class="addrow"><td><input name="new_ref" placeholder="Ref of a product not listed" class="narrow"></td><td>Count a product that is not listed</td><td></td><td><input type="number" step="any" name="new_count" class="narrow"></td></tr>
+</tbody></table>
+<button class="btn" type="submit">Apply counts</button></form>
+{% endif %}
+{% endblock %}

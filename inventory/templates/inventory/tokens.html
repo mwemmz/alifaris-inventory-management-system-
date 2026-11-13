@@ -1,0 +1,9 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>POS API tokens</h1></div>
+<p class="note">Your POS sends <code>Authorization: Token &lt;key&gt;</code> with every request to <code>/api/v1/</code>. Keep keys private.</p>
+<form method="post" class="sheet">{% csrf_token %}<div class="field"><label>New token name</label>{{ form.name }}</div><button class="btn">Create token</button></form>
+<table class="list"><thead><tr><th>Name</th><th>Key</th><th>Last used</th><th>Status</th><th></th></tr></thead><tbody>
+{% for t in tokens %}<tr><td>{{ t.name }}</td><td><code>{{ t.key }}</code></td><td>{{ t.last_used|date:"Y-m-d H:i"|default:"never" }}</td><td>{% if t.active %}Active{% else %}Revoked{% endif %}</td>
+<td>{% if t.active %}<form method="post" class="inline">{% csrf_token %}<button class="btn ghost" name="revoke" value="{{ t.pk }}">Revoke</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

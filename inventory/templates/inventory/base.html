@@ -1,0 +1,63 @@
+{% extends "launcher/base.html" %}
+{% load static %}
+{% block title %}{{ title|default:"Inventory" }} - Alifaris ERP{% endblock %}
+{% block bodyclass %}inv{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'inventory/inventory.css' %}">
+<header class="invbar">
+  <a class="apps" href="/" title="Apps" aria-label="Apps"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="currentColor"/></svg></a>
+  <a class="brand" href="{% url 'inventory:overview' %}">Inventory</a>
+  <nav class="menus">
+    <a href="{% url 'inventory:overview' %}">Overview</a>
+    <div class="dd"><button type="button">Operations</button><div class="dd-menu">
+      <h6>Transfers</h6>
+      <a href="{% url 'inventory:picking_list' 'receipts' %}">Receipts</a>
+      <a href="{% url 'inventory:picking_list' 'deliveries' %}">Deliveries</a>
+      <a href="{% url 'inventory:picking_list' 'internal' %}">Internal</a>
+      <h6>Adjustments</h6>
+      <a href="{% url 'inventory:physical_inventory' %}">Physical Inventory</a>
+      <a href="{% url 'inventory:scrap' %}">Scrap</a>
+      <a href="{% url 'inventory:landed' %}">Landed Costs</a>
+      <h6>Procurement</h6>
+      <a href="{% url 'inventory:replenishment' %}">Replenishment</a>
+    </div></div>
+    <a href="{% url 'inventory:products' %}">Products</a>
+    <div class="dd"><button type="button">Reporting</button><div class="dd-menu">
+      <a href="{% url 'inventory:report_stock' %}">Stock</a>
+      <a href="{% url 'inventory:report_locations' %}">Locations</a>
+      <a href="{% url 'inventory:report_moves' %}">Moves History</a>
+      <a href="{% url 'inventory:report_analysis' %}">Moves Analysis</a>
+      <a href="{% url 'inventory:report_valuation' %}">Valuation</a>
+    </div></div>
+    {% if request.user.is_staff %}
+    <div class="dd"><button type="button">Configuration</button><div class="dd-menu">
+      <h6>Warehouse Management</h6>
+      <a href="{% url 'inventory:crud_list' 'warehouses' %}">Warehouses</a>
+      <a href="{% url 'inventory:crud_list' 'locations' %}">Locations</a>
+      <h6>Products</h6>
+      <a href="{% url 'inventory:crud_list' 'categories' %}">Product Categories</a>
+      <h6>Units of Measure</h6>
+      <a href="{% url 'inventory:crud_list' 'uom-categories' %}">UoM Categories</a>
+      <a href="{% url 'inventory:crud_list' 'uoms' %}">Units of Measure</a>
+      <h6>Other</h6>
+      <a href="{% url 'inventory:crud_list' 'partners' %}">Contacts</a>
+      <a href="{% url 'inventory:zra_settings' %}">ZRA Smart Invoice</a>
+      <a href="{% url 'inventory:tokens' %}">POS API tokens</a>
+    </div></div>
+    <a href="{% url 'inventory:import' %}">Import Products</a>
+    {% endif %}
+    <a href="{% url 'inventory:zra_logs' %}">ZRA Logs</a>
+    <a href="{% url 'inventory:scan' %}">Scan</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="site" title="This installation">{{ site_code }}</span>
+    <span class="company">{{ company }}</span>
+    <div class="user"><button class="avatar" type="button" id="user-btn">{{ request.user.get_username|slice:":1"|upper }}</button>
+      <form class="user-menu" id="user-menu" method="post" action="{% url 'logout' %}" hidden>{% csrf_token %}
+        <div class="user-name">{{ request.user.get_username }}</div><button type="submit">Log out</button></form></div>
+  </div>
+</header>
+{% if messages %}<div class="msgs">{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+<main class="invmain">{% block body %}{% endblock %}</main>
+<script src="{% static 'inventory/inventory.js' %}"></script>
+{% endblock %}

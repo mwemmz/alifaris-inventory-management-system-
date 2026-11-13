@@ -1,0 +1,30 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp">
+  <a class="btn" href="{% url 'inventory:product_new' %}">New</a>
+  <h1>Products</h1>
+  <form class="search" method="get"><input name="q" value="{{ q }}" placeholder="Search by name, reference or barcode...">
+    <select name="filter" onchange="this.form.submit()"><option value="goods" {% if flt == 'goods' %}selected{% endif %}>Goods</option><option value="services" {% if flt == 'services' %}selected{% endif %}>Services</option><option value="all" {% if flt == 'all' %}selected{% endif %}>All</option><option value="archived" {% if flt == 'archived' %}selected{% endif %}>Archived</option></select>
+    <input type="hidden" name="view" value="{{ view }}"></form>
+  <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&q={{ q }}&filter={{ flt }}&view={{ view }}">&lsaquo;</a>{% endif %}
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}&q={{ q }}&filter={{ flt }}&view={{ view }}">&rsaquo;</a>{% endif %}</span>
+  <span class="views"><a class="{% if view == 'kanban' %}on{% endif %}" href="?view=kanban&q={{ q }}&filter={{ flt }}" title="Cards">&#9638;</a><a class="{% if view == 'list' %}on{% endif %}" href="?view=list&q={{ q }}&filter={{ flt }}" title="List">&#9776;</a></span>
+</div>
+{% if view == 'list' %}
+<table class="list"><thead><tr><th>Ref</th><th>Product</th><th>Price</th><th>Sec. price</th><th>Cost</th><th>On hand</th><th>ZRA</th></tr></thead><tbody>
+{% for p in page %}<tr class="click" data-href="{% url 'inventory:product_edit' p.pk %}"><td>{{ p.internal_ref }}</td><td>{{ p.name }}</td><td>{{ p.price }}</td><td>{{ p.secondary_price }}</td><td>{{ p.cost }}</td><td class="{% if p.qty_on_hand <= 0 %}zero{% endif %}">{{ p.qty_on_hand }}</td><td>{% if p.zra_registered %}Registered{% else %}-{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No products found.</td></tr>{% endfor %}</tbody></table>
+{% else %}
+<div class="kanban">
+{% for p in page %}
+  <a class="kcard" href="{% url 'inventory:product_edit' p.pk %}">
+    <div class="ktxt"><b>{{ p.name }}</b><span class="ref">[{{ p.internal_ref }}]</span>
+      <span>Price: {{ p.price }} ZK</span><span>Sec. Price: {{ p.secondary_price }} ZK</span>
+      <span>On hand: {{ p.qty_on_hand }} {{ p.uom|default:"Units" }}</span></div>
+    {% if p.image %}<img src="{{ p.image.url }}" alt="">{% endif %}
+  </a>
+{% empty %}<p class="empty">No products found. Use Import Products or New.</p>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

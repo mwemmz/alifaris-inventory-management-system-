@@ -1,0 +1,15 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Import Products</h1></div>
+<form method="post" enctype="multipart/form-data" class="sheet">{% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="field"><label>Import type</label>{{ form.mode }}</div>
+  <div class="field">{{ form.skip_errors }} <label class="inl" for="{{ form.skip_errors.id_for_label }}">{{ form.skip_errors.label }}</label></div>
+  <div class="field">{{ form.register_zra }} <label class="inl" for="{{ form.register_zra.id_for_label }}">{{ form.register_zra.label }}</label></div>
+  <div class="field"><label>{{ form.file.label }}</label>{{ form.file }}{{ form.file.errors }}</div>
+  <p class="note">Columns: internal_ref, name, barcode, category, uom, price, secondary_price, cost, min_qty, max_qty, tax_type, zra_item_class_code, opening_stock. <a href="{% url 'inventory:import_template' %}">Download CSV template</a></p>
+  <button class="btn" type="submit">Import Products</button>
+</form>
+{% if result %}<div class="sheet"><h3>Result</h3><p>{{ result.created }} created, {{ result.updated }} updated, {{ result.errors|length }} row(s) with errors.</p>
+{% if result.errors %}<table class="list"><thead><tr><th>Row</th><th>Problem</th></tr></thead><tbody>{% for n, msg in result.errors %}<tr><td>{{ n }}</td><td>{{ msg }}</td></tr>{% endfor %}</tbody></table>{% endif %}</div>{% endif %}
+{% endblock %}

@@ -36,7 +36,7 @@ MODULES = [
     ("accounting", "Accounting", "accounting", False),
     ("documents", "Documents", "documents", False),
     ("purchase", "Purchase", "purchase", False),
-    ("inventory", "Inventory", "inventory", False),
+    ("inventory", "Inventory", "inventory", True),
     ("manufacturing", "Manufacturing", "manufacturing", False),
     ("shop-floor", "Shop Floor", "shopfloor", False),
     ("barcode", "Barcode", "barcode", False),
@@ -44,8 +44,13 @@ MODULES = [
     ("apps", "Apps", "apps", False),
 ]
 
+# Built modules open their own screen instead of the "not built yet" page.
+URLS = {"inventory": "/inventory/"}
+
+
 def tiles():
-    return [{"slug": s, "label": l, "icon": ICONS[i], "built": b} for s, l, i, b in MODULES]
+    return [{"slug": s, "label": l, "icon": ICONS[i], "built": b, "url": URLS.get(s, "/app/%s/" % s)}
+            for s, l, i, b in MODULES]
 
 def get(slug):
     for s, l, i, b in MODULES:

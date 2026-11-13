@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "launcher",
+    "inventory",
 ]
 
 MIDDLEWARE = [
@@ -117,6 +118,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 
 # Email
@@ -132,3 +135,7 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 COMPANY_NAME = 'Alifaris Auto Spares Main'
+
+# Short code of this installation (shop/branch). Stamped on every stock move so sites can sync safely.
+SITE_CODE = os.environ.get("ALIFARIS_SITE_CODE", "MAIN")
+ALLOW_NEGATIVE_STOCK = os.environ.get("ALIFARIS_ALLOW_NEGATIVE_STOCK", "1") == "1"

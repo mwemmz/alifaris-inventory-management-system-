@@ -1,0 +1,9 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Landed cost</h1></div>
+<div class="sheet"><p><b>Receipt:</b> {{ lc.picking.ref }}</p><p><b>Description:</b> {{ lc.description }}</p><p><b>Amount:</b> {{ lc.amount }}</p>
+<p><b>Status:</b> {% if lc.applied %}Applied{% else %}Not applied{% endif %}</p>
+{% if not lc.applied %}<form method="post">{% csrf_token %}<button class="btn">Apply to product costs</button></form>
+<p class="note">The amount is spread over the receipt lines by value and added to each product's cost.</p>{% endif %}
+<a class="btn ghost" href="{% url 'inventory:landed' %}">Back</a></div>
+{% endblock %}

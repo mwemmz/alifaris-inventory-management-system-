@@ -1,0 +1,12 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>ZRA Traffic Log</h1>
+  {% if request.user.is_staff %}<form method="post" action="{% url 'inventory:zra_register_pending' %}" class="inline">{% csrf_token %}<button class="btn ghost">Register pending items</button></form>
+  <a class="btn ghost" href="{% url 'inventory:zra_settings' %}">Settings</a>{% endif %}
+  <form class="search" method="get"><select name="status" onchange="this.form.submit()"><option value="">All</option><option value="success" {% if status == 'success' %}selected{% endif %}>Success</option><option value="error" {% if status == 'error' %}selected{% endif %}>Error</option></select></form>
+  <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&status={{ status }}">&lsaquo;</a>{% endif %}{% if page.has_next %}<a href="?page={{ page.next_page_number }}&status={{ status }}">&rsaquo;</a>{% endif %}</span>
+</div>
+<table class="list"><thead><tr><th>Date</th><th>Tpin</th><th>Branch</th><th>Model</th><th>Endpoint</th><th>Status</th><th>Response message</th></tr></thead><tbody>
+{% for l in page %}<tr class="click {{ l.status }}" data-href="{% url 'inventory:zra_log_detail' l.pk %}"><td>{{ l.date|date:"Y-m-d H:i:s" }}</td><td>{{ l.tpin }}</td><td>{{ l.branch }}</td><td>{{ l.model }}</td><td class="trunc">{{ l.endpoint }}</td><td>{{ l.get_status_display }}</td><td class="trunc">{{ l.message }}</td></tr>
+{% empty %}<tr><td colspan="7" class="empty">No ZRA traffic yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

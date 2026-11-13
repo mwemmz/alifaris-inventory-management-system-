@@ -1,0 +1,7 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>ZRA log #{{ log.pk }}</h1></div>
+<div class="sheet"><p><b>When:</b> {{ log.date|date:"Y-m-d H:i:s" }} &nbsp; <b>Status:</b> {{ log.get_status_display }}</p><p><b>Endpoint:</b> {{ log.endpoint }}</p><p><b>Message:</b> {{ log.message }}</p>
+<h3>Request</h3><pre>{{ log.request_body|default:"(not sent)" }}</pre><h3>Response</h3><pre>{{ log.response_body|default:"(none)" }}</pre>
+<a class="btn ghost" href="{% url 'inventory:zra_logs' %}">Back</a></div>
+{% endblock %}
