@@ -1,0 +1,10 @@
+{% extends "launcher/base.html" %}
+{% block title %}{{ mod.label }} - Alifaris ERP{% endblock %}
+{% block content %}
+{% include "launcher/topbar.html" %}
+<main class="stub">
+  <h1>{{ mod.label }}</h1>
+  <p>This module is not built yet.</p>
+  <a class="btn" href="{% url 'home' %}">Back to apps</a>
+</main>
+{% endblock %}

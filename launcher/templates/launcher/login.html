@@ -1,0 +1,16 @@
+{% extends "launcher/base.html" %}
+{% block title %}Log in - Alifaris ERP{% endblock %}
+{% block bodyclass %}launcher login{% endblock %}
+{% block content %}
+<main class="login-box">
+  <h1>Alifaris ERP</h1>
+  <form method="post">
+    {% csrf_token %}
+    {% if form.errors %}<p class="err">Wrong username or password.</p>{% endif %}
+    <label>Username {{ form.username }}</label>
+    <label>Password {{ form.password }}</label>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn" type="submit">Log in</button>
+  </form>
+</main>
+{% endblock %}

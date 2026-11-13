@@ -1,0 +1,24 @@
+<header class="topbar">
+  <a class="topbar-menu" href="{% url 'home' %}" title="Apps" aria-label="Apps">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  {% block topbar_extra %}{% endblock %}
+  <div class="topbar-right">
+    <button class="icon-btn" type="button" title="Messages" aria-label="Messages">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M20 8h1a1 1 0 0 1 1 1v9l-3-3h-6" fill="currentColor" opacity=".6"/></svg>
+      {% if unread %}<span class="badge">{{ unread }}</span>{% endif %}
+    </button>
+    <button class="icon-btn" type="button" title="Activities" aria-label="Activities">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="company">{{ company }}</span>
+    <div class="user">
+      <button class="avatar" type="button" id="user-btn" aria-haspopup="true">{{ request.user.get_username|slice:":1"|upper }}</button>
+      <form class="user-menu" id="user-menu" method="post" action="{% url 'logout' %}" hidden>
+        {% csrf_token %}
+        <div class="user-name">{{ request.user.get_username }}</div>
+        <button type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+</header>

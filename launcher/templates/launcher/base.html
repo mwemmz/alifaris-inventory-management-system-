@@ -1,0 +1,13 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Alifaris ERP{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'launcher/launcher.css' %}">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% block content %}{% endblock %}
+<script src="{% static 'launcher/launcher.js' %}"></script>
+</body>
+</html>

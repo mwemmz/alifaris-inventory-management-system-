@@ -1,0 +1,21 @@
+{% extends "launcher/base.html" %}
+{% block bodyclass %}launcher{% endblock %}
+{% block content %}
+{% include "launcher/topbar.html" %}
+<main class="home">
+  {% if notice %}
+  <div class="notice" id="notice" role="status">
+    <span>{{ notice }}</span>
+    <button type="button" class="notice-x" id="notice-x" aria-label="Dismiss">&times;</button>
+  </div>
+  {% endif %}
+  <nav class="grid" aria-label="Applications">
+    {% for t in tiles %}
+    <a class="tile" href="{% url 'module' t.slug %}">
+      <span class="tile-icon">{{ t.icon }}</span>
+      <span class="tile-label">{{ t.label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+</main>
+{% endblock %}
