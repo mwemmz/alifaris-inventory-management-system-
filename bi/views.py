@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
 from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
 from django.contrib import messages
 from django.conf import settings
@@ -224,3 +224,67 @@ def draft_order(request):
     picking = stock.new_picking(op, lines, origin="Auto reorder", user=request.user, notes="Created from BI reorder suggestions")
     messages.success(request, f"Draft receipt {picking.ref} created with {len(lines)} product(s). Review it, then validate when the goods arrive.")
     return redirect("inventory:picking_detail", pk=picking.pk)
+
+
+def _pct(now, before):
+    if not before:
+        return None
+    return round((now - before) / before * 100)
+
+
+@login_required
+def dashboard(request):
+    if not request.user.is_staff:
+        return redirect("/")
+    from datetime import datetime
+    from django.db.models.functions import ExtractHour
+    from inventory.models import SyncPeer, ZraConfig
+    from pos.models import PosPayment, PosSession
+    today = date.today()
+
+    def day_total(d1, d2=None):
+        qs = PosOrder.objects.filter(created_at__date__gte=d1, created_at__date__lte=d2 or d1)
+        a = qs.aggregate(t=Sum("total"), n=Count("id", filter=Q(kind="sale")))
+        return a["t"] or ZERO, a["n"] or 0
+
+    t_today, n_today = day_total(today)
+    t_yest, _ = day_total(today - timedelta(days=1))
+    t_week, _ = day_total(today - timedelta(days=7))
+    first = today.replace(day=1)
+    t_mtd, n_mtd = day_total(first, today)
+    last_end = first - timedelta(days=1)
+    same_day = min(today.day, last_end.day)
+    t_lm, _ = day_total(last_end.replace(day=1), last_end.replace(day=same_day))
+
+    series = list(PosOrder.objects.filter(created_at__date__gte=today - timedelta(days=13))
+                  .annotate(d=TruncDate("created_at")).values("d").annotate(t=Sum("total")).order_by("d"))
+    got = {r["d"]: float(r["t"] or 0) for r in series}
+    days14 = [[(today - timedelta(days=i)).isoformat(), got.get(today - timedelta(days=i), 0)] for i in range(13, -1, -1)]
+    hours = list(PosOrder.objects.filter(created_at__date=today).annotate(h=ExtractHour("created_at"))
+                 .values("h").annotate(t=Sum("total")).order_by("h"))
+    top = list(PosOrderLine.objects.filter(order__created_at__date=today).values("name")
+               .annotate(t=Sum("line_total"), q=Sum("qty")).order_by("-t")[:5])
+    pays = list(PosPayment.objects.filter(order__created_at__date=today).values("method").annotate(t=Sum("amount")).order_by("-t"))
+    labels = dict(PosPayment.METHODS)
+    tills = []
+    for sess in PosSession.objects.filter(state="open").select_related("cashier"):
+        a = sess.orders.aggregate(t=Sum("total"), n=Count("id"))
+        tills.append({"s": sess, "total": a["t"] or ZERO, "n": a["n"]})
+    zra_on = ZraConfig.get().enabled
+    mine = PosOrder.objects.filter(remote=False)
+    value = ZERO
+    for p in Product.objects.filter(active=True):
+        if p.tracks_stock:
+            oh = p.on_hand
+            if oh > 0:
+                value += oh * p.cost
+    ctx = {"title": "Dashboard", "tab": "dash", "today": today,
+           "kpi": {"today": t_today, "orders": n_today, "avg": round(t_today / n_today, 2) if n_today else 0,
+                   "vs_yest": _pct(t_today, t_yest), "vs_week": _pct(t_today, t_week), "yest": t_yest,
+                   "mtd": t_mtd, "mtd_vs": _pct(t_mtd, t_lm), "mtd_orders": n_mtd},
+           "chart": {"days": days14, "hours": [[f"{r['h']:02d}:00", float(r["t"] or 0)] for r in hours],
+                     "pays": [[labels.get(r["method"], r["method"]), float(r["t"] or 0)] for r in pays]},
+           "top": top, "tills": tills, "flags": insights.anomalies()[:6], "reorder": len(insights.reorder_suggestions()),
+           "stock_value": value, "zra_on": zra_on, "zra_pending": mine.filter(zra_status="pending").count(),
+           "zra_failed": mine.filter(zra_status="failed").count(), "peers": SyncPeer.objects.filter(active=True)}
+    return render(request, "bi/dashboard.html", ctx)

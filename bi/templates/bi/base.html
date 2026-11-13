@@ -13,8 +13,8 @@
 td.b{width:30%}
 </style>
 <header class="posbar"><a class="apps" href="/" aria-label="Apps"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="currentColor"/></svg></a>
-<a class="brand" href="{% url 'bi:sales' %}">Reports &amp; BI</a>
-<nav><a href="{% url 'bi:sales' %}">Sales</a><a href="{% url 'bi:stock' %}">Stock</a><a href="{% url 'bi:insights' %}">Insights</a><a href="{% url 'pos:report' %}">Daily POS report</a></nav>
+<a class="brand" href="{% url 'bi:dashboard' %}">Reports &amp; BI</a>
+<nav><a href="{% url 'bi:dashboard' %}">Dashboard</a><a href="{% url 'bi:sales' %}">Sales</a><a href="{% url 'bi:stock' %}">Stock</a><a href="{% url 'bi:insights' %}">Insights</a><a href="{% url 'pos:report' %}">Daily POS report</a></nav>
 <span class="who">{{ request.user.get_username }}</span></header>
 {% if messages %}<div class="msgs">{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}</div>{% endif %}
 <script src="{% static 'bi/charts.js' %}"></script>

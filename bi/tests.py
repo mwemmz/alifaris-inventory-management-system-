@@ -14,16 +14,16 @@ class BiTests(PosBase):
         self.client.login(username="boss", password="x")
 
     def test_sales_filters_and_kpis(self):
-        r = self.client.get("/bi/", {"category": self.cat.pk, "min_price": 50, "max_price": 150, "q": "tyre"})
+        r = self.client.get("/bi/sales/", {"category": self.cat.pk, "min_price": 50, "max_price": 150, "q": "tyre"})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.context["kpi"]["total"], Decimal("200.00"))
         self.assertEqual(r.context["kpi"]["orders"], 1)
         self.assertEqual(r.context["kpi"]["cost"], Decimal("120"))
-        none = self.client.get("/bi/", {"min_price": 500})
+        none = self.client.get("/bi/sales/", {"min_price": 500})
         self.assertEqual(none.context["kpi"]["total"], 0)
 
     def test_exports_and_stock_page(self):
-        self.assertIn("text/csv", self.client.get("/bi/?export=csv")["Content-Type"])
+        self.assertIn("text/csv", self.client.get("/bi/sales/?export=csv")["Content-Type"])
         r = self.client.get("/bi/stock/", {"category": self.cat.pk})
         self.assertEqual(r.context["count"], 1)
         self.assertEqual(r.context["value"], Decimal("480"))  # 8 left x cost 60
@@ -31,7 +31,7 @@ class BiTests(PosBase):
 
     def test_managers_only(self):
         self.client.login(username="till1", password="x")
-        self.assertEqual(self.client.get("/bi/").status_code, 302)
+        self.assertEqual(self.client.get("/bi/sales/").status_code, 302)
 
 
 class InsightTests(PosBase):
@@ -58,7 +58,7 @@ class InsightTests(PosBase):
         self.sell(1, pay=[{"method": "cash", "amount": 100}])
         hist, future = insights.forecast()
         self.assertEqual(len(future), 7)
-        for u in ["/bi/insights/", "/bi/", "/bi/stock/"]:
+        for u in ["/bi/insights/", "/bi/sales/", "/bi/stock/", "/bi/"]:
             self.assertEqual(self.client.get(u).status_code, 200, u)
 
     def test_cash_shortage_is_flagged(self):
@@ -96,3 +96,17 @@ class InsightTests(PosBase):
             self.assertEqual(self.ask("qwertyuiop zzzz")["answer"], "Stock tyres.")
             self.assertNotIn("till1", u.call_args[0][0].data.decode())
             self.assertEqual(self.ask("sales today")["source"], "database")  # local answer wins, nothing sent
+
+
+class DashboardTests(PosBase):
+    def test_dashboard_numbers_and_access(self):
+        self.sell(2, pay=[{"method": "cash", "amount": 200}])
+        self.client.login(username="boss", password="x")
+        r = self.client.get("/bi/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["kpi"]["today"], Decimal("200.00"))
+        self.assertEqual(r.context["kpi"]["orders"], 1)
+        self.assertEqual(len(r.context["tills"]), 1)
+        self.assertEqual(len(r.context["chart"]["days"]), 14)
+        self.client.login(username="till1", password="x")
+        self.assertEqual(self.client.get("/bi/").status_code, 302)
