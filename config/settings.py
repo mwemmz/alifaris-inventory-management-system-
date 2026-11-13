@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "launcher",
     "inventory",
+    "pos",
 ]
 
 MIDDLEWARE = [
@@ -146,3 +147,8 @@ SITE_CODE = os.environ.get("ALIFARIS_SITE_CODE", "MAIN")
 ALLOW_NEGATIVE_STOCK = os.environ.get("ALIFARIS_ALLOW_NEGATIVE_STOCK", "1") == "1"
 
 HOME_NOTICE = os.environ.get("ALIFARIS_HOME_NOTICE", "")
+
+# Point of sale
+POS_PRICES_INCLUDE_TAX = os.environ.get("ALIFARIS_PRICES_INCLUDE_TAX", "1") == "1"  # shelf prices already contain VAT
+POS_MAX_DISCOUNT_CASHIER = int(os.environ.get("ALIFARIS_MAX_CASHIER_DISCOUNT", "10"))  # percent; managers are not limited
+POS_TAX_RATES = {"A": 16, "B": 16, "C1": 0, "C2": 0, "C3": 0, "D": 0}

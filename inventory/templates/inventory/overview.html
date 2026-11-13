@@ -7,7 +7,7 @@
   <section class="card">
     <h2>{{ c.title }}</h2><div class="sub">{{ site_code }}</div>
     <div class="stats"><div><b>{{ c.draft }}</b><span>To process</span></div><div><b>{{ c.done }}</b><span>Done</span></div></div>
-    <a class="btn" href="{% if c.pos %}{% url 'inventory:picking_list' 'deliveries' %}?q=POS{% else %}{% url 'inventory:picking_list' c.slug %}{% endif %}">Open</a>
+    <a class="btn" href="{% if c.pos %}{% url 'pos:order_list' %}{% else %}{% url 'inventory:picking_list' c.slug %}{% endif %}">Open</a>
     {% if not c.pos %}<a class="btn ghost" href="{% url 'inventory:picking_new' c.slug %}">New</a>{% endif %}
   </section>
 {% endfor %}

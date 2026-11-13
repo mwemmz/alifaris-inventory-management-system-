@@ -1,0 +1,10 @@
+{% extends "pos/base.html" %}
+{% block page %}
+<h2>Orders</h2>
+<form class="search"><input name="q" value="{{ q }}" placeholder="Receipt number or customer"><button class="btn">Search</button></form>
+<table class="t"><tr><th>Number</th><th>Date</th><th>Cashier</th><th>Customer</th><th class="r">Total</th><th>ZRA</th></tr>
+{% for o in page %}<tr><td><a href="{% url 'pos:order_detail' o.pk %}">{{ o.number }}</a>{% if o.kind == 'refund' %} <span class="tag">refund</span>{% endif %}{% if o.remote %} <span class="tag">other site</span>{% endif %}</td>
+<td>{{ o.created_at|date:"d M Y H:i" }}</td><td>{{ o.cashier_name }}</td><td>{{ o.customer_name }}</td><td class="r">{{ o.total|floatformat:2 }}</td><td>{{ o.get_zra_status_display }}</td></tr>
+{% empty %}<tr><td colspan="6">No orders.</td></tr>{% endfor %}</table>
+<p class="pager">{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&q={{ q }}">Newer</a>{% endif %} Page {{ page.number }} of {{ page.paginator.num_pages }} {% if page.has_next %}<a href="?page={{ page.next_page_number }}&q={{ q }}">Older</a>{% endif %}</p>
+{% endblock %}

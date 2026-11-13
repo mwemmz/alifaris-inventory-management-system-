@@ -314,6 +314,8 @@ class SiteSync(Base):
         def fake(method, url, token, body=None):
             if "/products/" in url:
                 return {"products": [product]}
+            if "/sync/orders/" in url:
+                return {"orders": []} if method == "GET" else {"added": 0}
             if method == "GET":
                 return {"moves": [move]} if "since" not in url else {"moves": []}
             sent.append(body)

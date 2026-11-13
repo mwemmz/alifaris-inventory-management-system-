@@ -45,9 +45,10 @@ def overview(request):
         qs = Picking.objects.filter(op_type__code=code)
         cards.append({"title": OP_TITLES[slug], "slug": slug, "draft": qs.filter(state=Picking.DRAFT).count(),
                       "done": qs.filter(state=Picking.DONE).count()})
-    pos = Picking.objects.filter(op_type__code=OperationType.DELIVERY).exclude(origin="")
-    cards.append({"title": "PoS Orders", "slug": "deliveries", "draft": pos.filter(state=Picking.DRAFT).count(),
-                  "done": pos.filter(state=Picking.DONE).count(), "pos": True})
+    from pos.models import PosOrder
+    pos = PosOrder.objects.filter(kind=PosOrder.SALE)
+    cards.append({"title": "PoS Orders", "slug": "deliveries", "draft": pos.filter(zra_status__in=["pending", "failed"]).count(),
+                  "done": pos.count(), "pos": True})
     low = len(stock.replenishment_candidates())
     return render(request, "inventory/overview.html", ctx(request, cards=cards, low=low,
                                                           products=Product.objects.filter(active=True).count()))

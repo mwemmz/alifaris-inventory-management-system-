@@ -1,0 +1,9 @@
+{% extends "pos/base.html" %}
+{% block page %}
+<form method="post" class="card narrow">{% csrf_token %}
+  <h2>Open a session</h2>
+  <label>Shop <select name="warehouse">{% for w in warehouses %}<option value="{{ w.pk }}">{{ w.name }}</option>{% endfor %}</select></label>
+  <label>Cash in the drawer now <input name="opening_cash" type="number" step="0.01" min="0" value="0" inputmode="decimal"></label>
+  <button class="btn primary">Start selling</button>
+</form>
+{% endblock %}

@@ -135,6 +135,39 @@ def sync_peer(peer):
             if len(batch) < BATCH:
                 break
         notes.append(f"{pushed} move(s) sent")
+
+        # POS sales records (reporting copy). Stock effects already travel as moves above.
+        from pos import services as pos_services
+        from pos.models import PosOrder
+        got = 0
+        while True:
+            qs = {"exclude_site": settings.SITE_CODE, "limit": BATCH}
+            if peer.last_order_pull:
+                qs["since"] = peer.last_order_pull.isoformat()
+            rows = _http("GET", f"{base}/sync/orders/?{urllib.parse.urlencode(qs)}", peer.token)["orders"]
+            if not rows:
+                break
+            pos_services.import_remote_orders(rows)
+            peer.last_order_pull = parse_datetime(rows[-1]["recorded_at"])
+            peer.save(update_fields=["last_order_pull"])
+            got += len(rows)
+            if len(rows) < BATCH:
+                break
+        sent_orders = 0
+        while True:
+            qs = PosOrder.objects.filter(remote=False, site_code=settings.SITE_CODE)
+            if peer.last_order_push:
+                qs = qs.filter(recorded_at__gt=peer.last_order_push)
+            batch = list(qs.order_by("recorded_at", "id")[:BATCH])
+            if not batch:
+                break
+            _http("POST", f"{base}/sync/orders/", peer.token, {"orders": [pos_services.order_to_dict(o) for o in batch]})
+            peer.last_order_push = batch[-1].recorded_at
+            peer.save(update_fields=["last_order_push"])
+            sent_orders += len(batch)
+            if len(batch) < BATCH:
+                break
+        notes.append(f"sales {got} received, {sent_orders} sent")
         result = "OK: " + ", ".join(notes)
         ok = True
     except (SyncError, Product.DoesNotExist, Location.DoesNotExist, KeyError, ValueError) as e:

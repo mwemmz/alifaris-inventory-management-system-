@@ -1,0 +1,20 @@
+{% load static %}<!doctype html><html><head><meta charset="utf-8"><title>{{ o.number }}</title>
+<style>
+@page{size:80mm auto;margin:3mm}
+body{font:12px/1.35 "Courier New",monospace;width:74mm;margin:0 auto;color:#000}
+h1{font-size:15px;text-align:center;margin:4px 0}.c{text-align:center}.r{text-align:right}
+table{width:100%;border-collapse:collapse}td{vertical-align:top;padding:1px 0}hr{border:0;border-top:1px dashed #000}
+.tot td{font-weight:bold;font-size:13px}@media screen{body{padding:10px;background:#fff}}
+</style></head><body{% if autoprint %} onload="window.print()"{% endif %}>
+<h1>{{ company }}</h1>
+<div class="c">{% if cfg.tpin %}TPIN {{ cfg.tpin }}<br>{% endif %}{{ o.site_code }}</div><hr>
+<div>{{ o.kind|yesno:"Receipt,Receipt" }} {{ o.number }}{% if o.kind == 'refund' %} (REFUND of {{ o.refund_of.number }}){% endif %}<br>
+{{ o.created_at|date:"d/m/Y H:i" }} · {{ o.cashier_name }}{% if o.customer_name %}<br>Customer: {{ o.customer_name }}{% endif %}{% if o.customer_tpin %}<br>TPIN: {{ o.customer_tpin }}{% endif %}</div><hr>
+<table>{% for l in o.lines.all %}<tr><td colspan="2">{{ l.name }}</td></tr>
+<tr><td>{{ l.qty|floatformat:"-3" }} x {{ l.unit_price }}{% if l.discount_pct %} (-{{ l.discount_pct|floatformat:"-2" }}%){% endif %}</td><td class="r">{{ l.line_total }}</td></tr>{% endfor %}</table><hr>
+<table><tr class="tot"><td>TOTAL</td><td class="r">{{ o.total }}</td></tr>
+<tr><td>incl. VAT</td><td class="r">{{ o.tax_total }}</td></tr>
+{% for p in o.payments.all %}<tr><td>{{ p.get_method_display }}</td><td class="r">{{ p.amount }}</td></tr>{% endfor %}
+{% if o.change_due %}<tr><td>Change</td><td class="r">{{ o.change_due }}</td></tr>{% endif %}</table><hr>
+<div class="c">{% if o.zra_status == 'sent' %}ZRA invoice submitted{% elif o.zra_status != 'na' %}ZRA invoice pending{% endif %}<br>Thank you</div>
+</body></html>

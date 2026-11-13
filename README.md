@@ -91,3 +91,17 @@ Move to PostgreSQL if one server will carry several busy shops. Put the site beh
 The site is installable on a phone (manifest and service worker). Pages you have opened stay readable offline; saving
 changes on a phone needs a connection (a shop that must work offline runs its own server and syncs, above).
 `desktop/` holds an Electron shell (see its README; syntax-checked but not yet built or run).
+
+## Point of Sale (same system, same database)
+
+The till lives at `/pos/` and is built into this project, so a sale is one transaction: order + payments + stock-out on the same ledger
+the Inventory screens read, so on-hand is correct everywhere the moment a sale completes.
+
+- **Roles:** staff = manager (price override, discounts above `ALIFARIS_MAX_CASHIER_DISCOUNT`%, refunds, sessions, report). Group **Cashier** = can sell. Created by `seed_inventory`.
+- **Session & cash-up:** open with float, close with counted cash; expected cash accounts for change given and refunds.
+- **Offline till:** the browser keeps the price list and queues sales on the device with a unique id; they upload automatically and can never be posted twice.
+- **Receipts:** `/pos/orders/<id>/receipt/` is laid out for 80 mm paper. The desktop wrapper can print silently (`desktop/README.md`).
+- **Refunds:** whole sale, manager only, money back the way it came in, stock returned once.
+- **ZRA:** each sale/refund is queued (`Waiting`) and sent with `python manage.py zra_send_sales --loop` or the *Send now* button on the report. Selling never waits on ZRA. Items with a bad class code are blocked locally and shown as Failed. **Untested against a live VSDC.**
+- **Sites:** `sync_sites` now also copies sales records between sites (for reporting); their stock effect travels as ledger moves, so nothing is deducted twice.
+- Settings: `ALIFARIS_PRICES_INCLUDE_TAX` (default 1), `ALIFARIS_MAX_CASHIER_DISCOUNT` (default 10).

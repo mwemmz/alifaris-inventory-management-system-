@@ -332,6 +332,8 @@ class SyncPeer(models.Model):
     last_product_pull = models.DateTimeField(null=True, blank=True, editable=False)
     last_move_pull = models.DateTimeField(null=True, blank=True, editable=False)
     last_move_push = models.DateTimeField(null=True, blank=True, editable=False)
+    last_order_pull = models.DateTimeField(null=True, blank=True, editable=False)
+    last_order_push = models.DateTimeField(null=True, blank=True, editable=False)
     last_result = models.CharField(max_length=300, blank=True, editable=False)
     last_run = models.DateTimeField(null=True, blank=True, editable=False)
 

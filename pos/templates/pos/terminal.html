@@ -1,0 +1,31 @@
+{% extends "pos/base.html" %}
+{% load static %}
+{% block page %}
+<div id="till" data-session="{{ session.uuid }}" data-catalog="{% url 'pos:catalog' %}" data-sale="{% url 'pos:sale_api' %}"
+     data-maxdisc="{{ max_discount }}" data-manager="{{ is_manager|yesno:'1,0' }}">
+{% csrf_token %}
+<section class="left">
+  <div class="searchrow"><input id="q" placeholder="Scan barcode or type name / reference, then Enter" autocomplete="off" autofocus>
+    <button class="btn" id="tier" title="Switch between price and secondary price">Price</button></div>
+  <div id="grid" class="grid"></div>
+</section>
+<section class="right">
+  <div class="status"><span id="net" class="dot"></span><span id="netlabel">Online</span><span id="queued"></span></div>
+  <div id="cart" class="cart"></div>
+  <div class="custrow"><select id="cust"><option value="">Walk-in customer</option>{% for p in partners %}<option value="{{ p.pk }}">{{ p.name }}</option>{% endfor %}</select></div>
+  <div class="totals"><div>VAT <span id="vat">0.00</span></div><div class="grand">Total <span id="total">0.00</span></div></div>
+  <div class="actions"><button class="btn" id="clear">Clear</button><button class="btn primary big" id="pay">Pay</button></div>
+</section>
+</div>
+<div id="paydlg" class="modal" hidden><div class="card">
+  <h2>Payment <span id="due"></span></h2>
+  <div id="paylines"></div>
+  <div class="paybtns"></div>
+  <div class="paysum"><span>Paid <b id="paid">0.00</b></span><span id="chg"></span></div>
+  <div class="actions"><button class="btn" id="paycancel">Cancel</button><button class="btn primary big" id="payok">Complete sale</button></div>
+  <div id="payerr" class="msg error" hidden></div>
+</div></div>
+<div id="done" class="modal" hidden><div class="card"><h2>Sale complete</h2><p id="donetxt"></p>
+  <div class="actions"><a class="btn" id="printlink" target="_blank">Print receipt</a><button class="btn primary" id="next">Next sale</button></div></div></div>
+<script src="{% static 'pos/pos.js' %}"></script>
+{% endblock %}

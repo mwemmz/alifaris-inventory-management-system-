@@ -1,0 +1,19 @@
+{% extends "pos/base.html" %}
+{% block page %}
+<div class="card">
+  <h2>{{ o.number }} {% if o.kind == 'refund' %}<span class="tag">refund of {{ o.refund_of.number }}</span>{% endif %}</h2>
+  <p>{{ o.created_at|date:"d M Y H:i" }} · {{ o.cashier_name }} · {{ o.site_code }}{% if o.customer_name %} · {{ o.customer_name }}{% endif %}</p>
+  <table class="t"><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Disc %</th><th class="r">Total</th></tr>
+  {% for l in o.lines.all %}<tr><td>{{ l.ref }} {{ l.name }}</td><td class="r">{{ l.qty|floatformat:"-3" }}</td><td class="r">{{ l.unit_price }}</td><td class="r">{{ l.discount_pct|floatformat:"-2" }}</td><td class="r">{{ l.line_total }}</td></tr>{% endfor %}
+  <tr><th colspan="4">Total (VAT {{ o.tax_total }})</th><th class="r">{{ o.total }}</th></tr></table>
+  <p>Paid: {% for p in o.payments.all %}{{ p.get_method_display }} {{ p.amount }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if o.change_due %} · Change {{ o.change_due }}{% endif %}</p>
+  <p>ZRA: <b>{{ o.get_zra_status_display }}</b> {{ o.zra_message }}</p>
+  {% if o.picking %}<p>Stock document: <a href="{% url 'inventory:picking_detail' o.picking.pk %}">{{ o.picking.ref }}</a></p>{% endif %}
+  <a class="btn" href="{% url 'pos:receipt' o.pk %}?print=1" target="_blank">Print receipt</a>
+  {% if is_manager and o.kind == 'sale' and not o.remote %}
+    {% if o.refunded_by %}<span class="tag">Already refunded as <a href="{% url 'pos:order_detail' o.refunded_by.pk %}">{{ o.refunded_by.number }}</a></span>
+    {% else %}<form method="post" action="{% url 'pos:refund' o.pk %}" class="inline" onsubmit="return confirm('Refund the whole sale?')">{% csrf_token %}
+      <input name="reason" placeholder="Reason (optional)"><button class="btn danger">Refund</button></form>{% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "launcher/base.html" %}
+{% load static %}
+{% block title %}{{ title|default:"Point of Sale" }} - Alifaris ERP{% endblock %}
+{% block bodyclass %}pos{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'pos/pos.css' %}">
+<header class="posbar">
+  <a class="apps" href="/" title="Apps" aria-label="Apps"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="currentColor"/></svg></a>
+  <a class="brand" href="{% url 'pos:terminal' %}">Point of Sale</a>
+  <nav>
+    <a href="{% url 'pos:terminal' %}">Till</a>
+    <a href="{% url 'pos:order_list' %}">Orders</a>
+    {% if session %}<a href="{% url 'pos:session_close' %}">Close session</a>{% endif %}
+    {% if is_manager %}<a href="{% url 'pos:session_list' %}">Sessions</a><a href="{% url 'pos:report' %}">Report</a><a href="{% url 'inventory:overview' %}">Inventory</a>{% endif %}
+  </nav>
+  <span class="who">{{ request.user.get_username }}{% if session %} · {{ session.warehouse.code }}{% endif %}</span>
+</header>
+{% if messages %}<div class="msgs">{% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+<main class="page">{% block page %}{% endblock %}</main>
+{% endblock %}
