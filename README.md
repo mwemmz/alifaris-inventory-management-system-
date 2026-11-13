@@ -105,3 +105,9 @@ the Inventory screens read, so on-hand is correct everywhere the moment a sale c
 - **ZRA:** each sale/refund is queued (`Waiting`) and sent with `python manage.py zra_send_sales --loop` or the *Send now* button on the report. Selling never waits on ZRA. Items with a bad class code are blocked locally and shown as Failed. **Untested against a live VSDC.**
 - **Sites:** `sync_sites` now also copies sales records between sites (for reporting); their stock effect travels as ledger moves, so nothing is deducted twice.
 - Settings: `ALIFARIS_PRICES_INCLUDE_TAX` (default 1), `ALIFARIS_MAX_CASHIER_DISCOUNT` (default 10).
+
+## Reports & BI (`/bi/`, managers only; the Dashboards tile)
+
+- **Sales analysis:** filter by date range, department (category, including sub-categories), product name/ref/barcode, price range, cashier, site, customer, price tier and payment method; group time by day/week/month. Shows sales incl./excl. VAT, estimated margin, orders, average order, units, plus breakdowns by department, product, cashier and site, with CSV export.
+- **Stock analysis:** stock value at cost and at selling price by department, filter by category/product/price, low-stock and out-of-stock views, CSV export.
+- Margin uses each product's current cost (sale lines do not store cost yet), so treat it as an estimate.

@@ -1,0 +1,36 @@
+{% extends "bi/base.html" %}
+{% block page %}
+<form class="card filters" method="get">
+ <label>From<input type="date" name="from" value="{{ d_from|date:'Y-m-d' }}"></label>
+ <label>To<input type="date" name="to" value="{{ d_to|date:'Y-m-d' }}"></label>
+ <label>Department / category<select name="category"><option value="">All</option>{% for c in categories %}<option value="{{ c.pk }}" {% if g.category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+ <label>Product (name, ref, barcode)<input name="q" value="{{ g.q }}"></label>
+ <label>Price from<input type="number" step="0.01" name="min_price" value="{{ g.min_price }}"></label>
+ <label>Price to<input type="number" step="0.01" name="max_price" value="{{ g.max_price }}"></label>
+ <label>Cashier<select name="cashier"><option value="">All</option>{% for c in cashiers %}<option {% if g.cashier == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+ <label>Site<select name="site"><option value="">All</option>{% for c in sites %}<option {% if g.site == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+ <label>Customer<input name="customer" value="{{ g.customer }}"></label>
+ <label>Price tier<select name="tier"><option value="">Any</option><option value="primary" {% if g.tier == 'primary' %}selected{% endif %}>Price</option><option value="secondary" {% if g.tier == 'secondary' %}selected{% endif %}>Secondary</option></select></label>
+ <label>Paid by<select name="pay"><option value="">Any</option><option value="cash" {% if g.pay == 'cash' %}selected{% endif %}>Cash</option><option value="card" {% if g.pay == 'card' %}selected{% endif %}>Card</option><option value="mobile" {% if g.pay == 'mobile' %}selected{% endif %}>Mobile money</option><option value="bank" {% if g.pay == 'bank' %}selected{% endif %}>Bank</option><option value="credit" {% if g.pay == 'credit' %}selected{% endif %}>On account</option></select></label>
+ <label>Group time by<select name="by"><option value="">Day</option><option value="week" {% if g.by == 'week' %}selected{% endif %}>Week</option><option value="month" {% if g.by == 'month' %}selected{% endif %}>Month</option></select></label>
+ <div><button class="btn primary">Apply</button> <a class="btn" href="{% url 'bi:sales' %}">Reset</a></div>
+</form>
+<div class="kpis">
+ <div class="card"><b>{{ kpi.total|floatformat:2 }}</b><br>Sales incl. VAT</div>
+ <div class="card"><b>{{ kpi.net|floatformat:2 }}</b><br>Sales excl. VAT</div>
+ <div class="card"><b>{{ kpi.margin|floatformat:2 }}</b><br>Est. margin ({{ kpi.margin_pct }}%)</div>
+ <div class="card"><b>{{ kpi.orders }}</b><br>Orders</div>
+ <div class="card"><b>{{ kpi.avg }}</b><br>Avg order</div>
+ <div class="card"><b>{{ kpi.units|floatformat:"-0" }}</b><br>Units sold</div>
+</div>
+<p><small>Margin uses each product's <i>current</i> cost, so it is an estimate. Refunds count as negative sales. Filters on product, price or category analyse those lines only.</small></p>
+<div class="card"><h3>Sales over time</h3><table class="t">{% for r in series %}<tr><td>{{ r.d|date:"d M Y" }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% empty %}<tr><td>No sales match these filters.</td></tr>{% endfor %}</table></div>
+<div class="grid2">
+<div class="card"><h3>By department / category</h3><table class="t">{% for r in by_category %}<tr><td>{{ r.product__category__name|default:"Uncategorised" }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td><td class="r">{{ r.margin|floatformat:0 }}</td></tr>{% endfor %}</table><small>Columns: sales, est. margin</small></div>
+<div class="card"><h3>By cashier</h3><table class="t">{% for r in by_cashier %}<tr><td>{{ r.order__cashier_name }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% endfor %}</table>
+<h3>By site</h3><table class="t">{% for r in by_site %}<tr><td>{{ r.order__site_code }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% endfor %}</table></div>
+</div>
+<div class="card"><h3>Top products <a class="btn" style="float:right" href="?{{ request.GET.urlencode }}&export=csv">Export CSV</a></h3>
+<table class="t"><tr><th>Ref</th><th>Product</th><th class="r">Qty</th><th class="r">Sales</th><th class="r">Est. margin</th><th></th></tr>
+{% for r in by_product %}<tr><td>{{ r.ref }}</td><td>{{ r.name }}</td><td class="r">{{ r.units|floatformat:"-3" }}</td><td class="r">{{ r.total|floatformat:2 }}</td><td class="r {% if r.margin < 0 %}neg{% endif %}">{{ r.margin|floatformat:2 }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td></tr>{% endfor %}</table></div>
+{% endblock %}

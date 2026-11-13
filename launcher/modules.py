@@ -29,7 +29,7 @@ MODULES = [
     ("discuss", "Discuss", "discuss", False),
     ("contacts", "Contacts", "contacts", False),
     ("sales", "Sales", "sales", False),
-    ("dashboards", "Dashboards", "dashboards", False),
+    ("dashboards", "Dashboards", "dashboards", True),
     ("subscriptions", "Subscriptions", "subscriptions", False),
     ("point-of-sale", "Point of Sale", "pos", True),
     ("alifaris-motors", "Alifaris Motors", "motors", False),
@@ -45,7 +45,7 @@ MODULES = [
 ]
 
 # Built modules open their own screen instead of the "not built yet" page.
-URLS = {"inventory": "/inventory/", "point-of-sale": "/pos/"}
+URLS = {"inventory": "/inventory/", "point-of-sale": "/pos/", "dashboards": "/bi/"}
 
 
 def tiles():

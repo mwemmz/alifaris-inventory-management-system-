@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "launcher",
     "inventory",
     "pos",
+    "bi",
 ]
 
 MIDDLEWARE = [
