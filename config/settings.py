@@ -94,7 +94,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 if os.environ.get("DATABASE_URL"):
     # Hosted PostgreSQL (for example Neon): DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
     from urllib.parse import parse_qsl, unquote, urlparse
-    _u = urlparse(os.environ["DATABASE_URL"])
+    # Be forgiving about how it was pasted: stray quotes, spaces, or Neon's "psql '...'" command form
+    _raw = os.environ["DATABASE_URL"].strip()
+    if _raw.lower().startswith("psql"):
+        _raw = _raw[4:].strip()
+    _raw = _raw.strip("'\"` \t\r\n")
+    _u = urlparse(_raw)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
