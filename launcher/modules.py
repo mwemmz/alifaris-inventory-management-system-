@@ -27,25 +27,47 @@ ICONS = {
 # slug, label, icon key, built?
 MODULES = [
     ("discuss", "Discuss", "discuss", False),
-    ("contacts", "Contacts", "contacts", False),
-    ("sales", "Sales", "sales", False),
+    ("contacts", "Contacts", "contacts", True),
+    ("sales", "Sales", "sales", True),
     ("dashboards", "Dashboards", "dashboards", True),
     ("subscriptions", "Subscriptions", "subscriptions", False),
     ("point-of-sale", "Point of Sale", "pos", True),
     ("alifaris-motors", "Alifaris Motors", "motors", False),
     ("accounting", "Accounting", "accounting", False),
     ("documents", "Documents", "documents", False),
-    ("purchase", "Purchase", "purchase", False),
+    ("purchase", "Purchase", "purchase", True),
     ("inventory", "Inventory", "inventory", True),
     ("manufacturing", "Manufacturing", "manufacturing", False),
     ("shop-floor", "Shop Floor", "shopfloor", False),
-    ("barcode", "Barcode", "barcode", False),
+    ("barcode", "Barcode", "barcode", True),
     ("employees", "Employees", "employees", False),
     ("apps", "Apps", "apps", False),
 ]
 
 # Built modules open their own screen instead of the "not built yet" page.
-URLS = {"inventory": "/inventory/", "point-of-sale": "/pos/", "dashboards": "/bi/"}
+URLS = {"inventory": "/inventory/", "point-of-sale": "/pos/", "dashboards": "/bi/",
+        "contacts": "/inventory/config/partners/", "sales": "/pos/orders/", "purchase": "/inventory/purchase/",
+        "barcode": "/inventory/scan/"}
+
+# What each tile does today or is planned to do. Not-yet-built ones show this instead of a blank page.
+INFO = {
+    "contacts": "Customers and suppliers in one list, with TPIN and credit limits.",
+    "sales": "Every till sale and refund, with receipts and ZRA status.",
+    "purchase": "Purchase orders to suppliers, receiving goods into stock.",
+    "barcode": "Scan a barcode to look up a product, its price and stock.",
+    "dashboards": "Sales, profit, stock and reorder insights for managers.",
+    "point-of-sale": "The till: sessions, sales, refunds and receipts, online or offline.",
+    "inventory": "Stock levels, receipts, deliveries, transfers, counts and valuation.",
+    "accounting": "Planned for a later phase: invoices and bills, payments, chart of accounts, VAT returns and profit and loss.",
+    "employees": "Planned for a later phase: staff records, attendance, leave and payroll.",
+    "discuss": "Planned for a later phase: messages and notes between staff, attached to products, orders and customers.",
+    "subscriptions": "Planned: recurring billing for regular customers, such as monthly fleet accounts.",
+    "alifaris-motors": "Planned: vehicle sales and workshop jobs, linked to the parts stock.",
+    "documents": "Planned: one place for supplier invoices, ZRA documents and contracts, linked to the records they belong to.",
+    "manufacturing": "Not needed for a parts shop today. Available later if Alifaris starts assembling or kitting products.",
+    "shop-floor": "Not needed for a parts shop today. Works with Manufacturing for workshop tablets, if ever required.",
+    "apps": "Every module in the system and where it stands.",
+}
 
 
 def tiles():
@@ -55,5 +77,10 @@ def tiles():
 def get(slug):
     for s, l, i, b in MODULES:
         if s == slug:
-            return {"slug": s, "label": l, "built": b}
+            return {"slug": s, "label": l, "built": b, "info": INFO.get(s, "")}
     return None
+
+
+def catalogue():
+    return [{"slug": s, "label": l, "built": b, "info": INFO.get(s, ""), "url": URLS.get(s, "/app/%s/" % s)}
+            for s, l, i, b in MODULES if s != "apps"]

@@ -46,6 +46,8 @@ def module(request, slug):
     mod = modules.get(slug)
     if not mod:
         raise Http404
+    if slug == "apps":
+        return render(request, "launcher/apps.html", {"mods": modules.catalogue(), "company": settings.COMPANY_NAME})
     return render(request, "launcher/module_stub.html", {"mod": mod, "company": settings.COMPANY_NAME})
 
 

@@ -1,0 +1,19 @@
+{% extends "launcher/base.html" %}
+{% block title %}Apps - Alifaris ERP{% endblock %}
+{% block content %}
+{% include "launcher/topbar.html" %}
+<main class="stub" style="max-width:860px;text-align:left">
+  <h1 style="text-align:center">Apps</h1>
+  <p style="text-align:center">What is running in this system, and what is planned.</p>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="text-align:left;border-bottom:2px solid #ddd"><th style="padding:8px">Module</th><th>What it does</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for m in mods %}<tr style="border-bottom:1px solid #eee">
+      <td style="padding:8px"><b>{% if m.built %}<a href="{{ m.url }}">{{ m.label }}</a>{% else %}<a href="{{ m.url }}">{{ m.label }}</a>{% endif %}</b></td>
+      <td>{{ m.info }}</td>
+      <td>{% if m.built %}<span style="color:#1d7a3a;font-weight:600">Running</span>{% else %}<span style="color:#8a6d00">Planned</span>{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <p style="text-align:center;margin-top:24px"><a class="btn" href="{% url 'home' %}">Back to apps</a></p>
+</main>
+{% endblock %}
