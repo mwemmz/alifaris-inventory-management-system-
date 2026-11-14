@@ -197,3 +197,6 @@ POS_TAX_RATES = {"A": 16, "B": 16, "C1": 0, "C2": 0, "C3": 0, "D": 0}
 # Optional "Ask your data" box on the Insights page. Leave the key empty to keep it switched off.
 AI_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 AI_MODEL = os.environ.get("ALIFARIS_AI_MODEL", "claude-sonnet-5-5")
+
+# Home-screen tiles for modules that are not built yet (Accounting, Employees, ...) stay hidden unless this is 1.
+SHOW_PLANNED_MODULES = os.environ.get("SHOW_PLANNED_MODULES", "0") == "1"

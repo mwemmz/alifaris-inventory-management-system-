@@ -44,7 +44,7 @@ def home(request):
 @login_required
 def module(request, slug):
     mod = modules.get(slug)
-    if not mod:
+    if not mod or (not mod["built"] and not modules.show_planned()):
         raise Http404
     if slug == "apps":
         return render(request, "launcher/apps.html", {"mods": modules.catalogue(), "company": settings.COMPANY_NAME})

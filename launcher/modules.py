@@ -70,9 +70,15 @@ INFO = {
 }
 
 
+def show_planned():
+    """Planned modules are hidden unless SHOW_PLANNED_MODULES=1, so a client sees only what Phase 1 delivers."""
+    from django.conf import settings
+    return getattr(settings, "SHOW_PLANNED_MODULES", False)
+
+
 def tiles():
     return [{"slug": s, "label": l, "icon": ICONS[i], "built": b, "url": URLS.get(s, "/app/%s/" % s)}
-            for s, l, i, b in MODULES]
+            for s, l, i, b in MODULES if b or show_planned()]
 
 def get(slug):
     for s, l, i, b in MODULES:
@@ -83,4 +89,4 @@ def get(slug):
 
 def catalogue():
     return [{"slug": s, "label": l, "built": b, "info": INFO.get(s, ""), "url": URLS.get(s, "/app/%s/" % s)}
-            for s, l, i, b in MODULES if s != "apps"]
+            for s, l, i, b in MODULES if s != "apps" and (b or show_planned())]
