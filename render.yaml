@@ -1,0 +1,27 @@
+# Render Blueprint: New > Blueprint > pick this repository.
+# Free plan: the service sleeps after 15 minutes idle and its disk is wiped on every restart, so demo data is
+# rebuilt at start (ALIFARIS_DEMO=1). For real use switch to a paid plan, add a disk and set ALIFARIS_DB_PATH
+# to a file on it, and set ALIFARIS_DEMO=0 (see README, Deploying).
+services:
+  - type: web
+    name: alifaris-demo
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: ./start.sh
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: ALIFARIS_DEMO
+        value: "1"
+      - key: ALIFARIS_DEMO_PASSWORD
+        generateValue: true
+      - key: ALIFARIS_SITE_CODE
+        value: MAIN

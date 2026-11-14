@@ -87,6 +87,23 @@ server (or put behind a proxy) when `DJANGO_DEBUG=0`. The database is SQLite in 
 with a POS and a few users; **back up `db.sqlite3` regularly** (copy it while the app is idle, or use `sqlite3 db.sqlite3 ".backup copy.db"`).
 Move to PostgreSQL if one server will carry several busy shops. Put the site behind HTTPS before using it away from your own network.
 
+### Render (demo or small live site)
+
+`render.yaml` is a Blueprint for Render: **New > Blueprint**, pick this repository, apply. It builds with `build.sh`,
+starts with `start.sh` (migrate, `seed_inventory`, then `seed_demo` when `ALIFARIS_DEMO=1`) and checks `/healthz`.
+
+- **Logins:** `manager`, `warehouse` (Warehouse Manager), `keeper` (Storekeeper), `cashier1`, `cashier2`. Render generates
+  the shared password: open the service, **Environment**, `ALIFARIS_DEMO_PASSWORD`.
+- **Demo data** is made up: 42 auto parts in kwacha and 30 days of sales, refunds, cash-ups and a stock count, so the
+  dashboards, reorder suggestions and warehouse screen have something to show. It never runs on a database that already has products
+  (`seed_demo --force` overrides that).
+- **Free plan:** the service sleeps after 15 minutes idle (the first request then takes 30 to 60 seconds) and its disk is
+  wiped on every restart, so demo data is rebuilt each time. Open the site a few minutes before a meeting.
+- **Real use:** choose a paid plan, add a disk, set `ALIFARIS_DB_PATH` to a file on it (for example `/data/db.sqlite3`),
+  set `ALIFARIS_DEMO=0`, create the manager with `python manage.py createsuperuser`, and keep backups.
+- `PYTHON_VERSION` in `render.yaml` must be a version Render offers (Django 6 needs Python 3.12 or newer).
+- Product photos uploaded to `media/` are not served when `DJANGO_DEBUG=0` and do not survive a restart on the free plan.
+
 ## Mobile PWA and desktop
 
 The site is installable on a phone (manifest and service worker). Pages you have opened stay readable offline; saving

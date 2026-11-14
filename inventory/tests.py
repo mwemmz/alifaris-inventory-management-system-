@@ -385,3 +385,30 @@ class HomeNotice(Base):
         self.client.login(username="x", password="pw")
         r = self.client.get("/")
         self.assertContains(r, "below their reorder minimum")
+
+
+class DemoSeed(TestCase):
+    def test_demo_data_builds_and_is_consistent(self):
+        import os
+        from unittest import mock
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        from pos.models import PosOrder
+        from .models import Product, StockQuant
+        with mock.patch.dict(os.environ, {"ALIFARIS_DEMO_PASSWORD": ""}):
+            with self.assertRaises(CommandError):
+                call_command("seed_demo", days=2, verbosity=0)
+        with mock.patch.dict(os.environ, {"ALIFARIS_DEMO_PASSWORD": "pw-for-tests-1"}):
+            call_command("seed_demo", days=3, verbosity=0)
+            self.assertTrue(Product.objects.count() >= 40)
+            self.assertTrue(PosOrder.objects.filter(kind="sale").exists())
+            self.assertFalse(StockQuant.objects.filter(qty__lt=0).exists())
+            self.assertTrue(self.client.login(username="manager", password="pw-for-tests-1"))
+            self.assertEqual(self.client.get("/bi/").status_code, 200)
+            self.assertEqual(self.client.get("/inventory/warehouse/").status_code, 200)
+            n = Product.objects.count()
+            call_command("seed_demo", days=3, verbosity=0)  # second run must not duplicate anything
+            self.assertEqual(Product.objects.count(), n)
+
+    def test_health_check_needs_no_login(self):
+        self.assertEqual(self.client.get("/healthz").status_code, 200)

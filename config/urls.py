@@ -2,9 +2,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from pos import api as pos_api
+from django.http import HttpResponse
 from django.urls import include, path
 
 urlpatterns = [
+    path("healthz", lambda request: HttpResponse("ok", content_type="text/plain")),
     path("admin/", admin.site.urls),
     path("inventory/", include("inventory.urls")),
     path("pos/", include("pos.urls")),
