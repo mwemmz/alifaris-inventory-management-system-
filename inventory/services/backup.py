@@ -8,9 +8,20 @@ from django.conf import settings
 from django.db import connection
 
 
+class BackupUnavailable(Exception):
+    pass
+
+
+def is_sqlite():
+    return connection.vendor == "sqlite"
+
+
 def make_backup(dest_dir=None, keep=None):
     """Write a timestamped copy using SQLite's online backup API. Returns the file path.
     With `keep`, older backup files in dest_dir beyond that many are removed."""
+    if not is_sqlite():
+        raise BackupUnavailable("This system uses a hosted PostgreSQL database. Its backups are taken by the database "
+                                "provider (Neon: Backup & Restore / point-in-time restore), or with pg_dump.")
     dest_dir = Path(dest_dir or tempfile.gettempdir())
     dest_dir.mkdir(parents=True, exist_ok=True)
     name = f"alifaris-{settings.SITE_CODE}-{datetime.now():%Y%m%d-%H%M%S}.sqlite3"

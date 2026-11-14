@@ -575,7 +575,8 @@ class PurchaseAndData(Base):
         from pathlib import Path
         from django.conf import settings
         with tempfile.TemporaryDirectory() as d:
-            env = dict(os.environ, ALIFARIS_DB_PATH=str(Path(d) / "live.sqlite3"), DJANGO_DEBUG="1")
+            env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+            env.update(ALIFARIS_DB_PATH=str(Path(d) / "live.sqlite3"), DJANGO_DEBUG="1")
             run = lambda *args: subprocess.run([sys.executable, "manage.py", *args], cwd=settings.BASE_DIR, env=env,
                                                capture_output=True, text=True, timeout=90)
             self.assertEqual(run("migrate", "--noinput").returncode, 0)

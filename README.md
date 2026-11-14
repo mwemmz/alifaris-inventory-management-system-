@@ -91,6 +91,10 @@ Each sale line keeps the product's average cost at the moment of sale, so margin
 - **Purchase orders** (Operations, Procurement): draft, mark as ordered, **Receive goods** (creates the draft receipt for the supplier; validating that receipt adds the stock, updates average cost and closes the order). Replenishment can draft an order for everything below its minimum. Suppliers are contacts with Supplier ticked.
 - **Backup and exports** (Configuration, Data): managers download a consistent copy of the database and Excel files for products, valuation, movements, purchase orders, sales with profit and customers who owe. For automatic backups schedule `python manage.py backup_db --to backups --keep 14`. Keep copies off the machine; restoring means replacing the database file.
 
+## Hosted database (Neon)
+
+Set `DATABASE_URL` (Neon: Dashboard, Connect, copy the connection string, e.g. `postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require`) and the app uses PostgreSQL instead of the local SQLite file. Same code, same screens; the full test suite passes on both. With Neon the provider keeps the backups (use its point-in-time restore); the in-app "Download backup" and `backup_db` apply to SQLite installs only. The Excel exports work on both.
+
 ## Deploying
 
     pip install -r requirements.txt

@@ -91,15 +91,36 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        # ALIFARIS_DB_PATH lets a host put the database on a persistent disk
-        "NAME": os.environ.get("ALIFARIS_DB_PATH") or BASE_DIR / "db.sqlite3",
-        # WAL lets the POS write while managers read; the timeout waits instead of failing on a busy database
-        "OPTIONS": {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"},
+if os.environ.get("DATABASE_URL"):
+    # Hosted PostgreSQL (for example Neon): DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+    from urllib.parse import parse_qsl, unquote, urlparse
+    _u = urlparse(os.environ["DATABASE_URL"])
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(_u.path.lstrip("/")),
+            "USER": unquote(_u.username or ""),
+            "PASSWORD": unquote(_u.password or ""),
+            "HOST": _u.hostname,
+            "PORT": _u.port or "",
+            # sslmode=require etc. come from the URL's query string
+            "OPTIONS": dict(parse_qsl(_u.query)),
+            # Neon's pooled connection string (host contains -pooler) cannot use server-side cursors
+            "DISABLE_SERVER_SIDE_CURSORS": True,
+            "CONN_MAX_AGE": 60,
+            "CONN_HEALTH_CHECKS": True,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            # ALIFARIS_DB_PATH lets a host put the database on a persistent disk
+            "NAME": os.environ.get("ALIFARIS_DB_PATH") or BASE_DIR / "db.sqlite3",
+            # WAL lets the POS write while managers read; the timeout waits instead of failing on a busy database
+            "OPTIONS": {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"},
+        }
+    }
 
 
 # Password validation

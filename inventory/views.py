@@ -710,8 +710,12 @@ def po_from_replenishment(request):
 def backup_download(request):
     """Manager-only: download a consistent copy of the whole database."""
     from django.http import FileResponse
-    from .services.backup import make_backup
-    path = make_backup()
+    from .services.backup import BackupUnavailable, make_backup
+    try:
+        path = make_backup()
+    except BackupUnavailable as e:
+        messages.info(request, str(e))
+        return redirect("inventory:data")
     audit.log(request, "database backup downloaded", path.name)
     resp = FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
     path.unlink(missing_ok=True)  # the open handle keeps the data readable on Linux
@@ -749,4 +753,4 @@ def data_page(request):
     return render(request, "inventory/data.html", ctx(request, title="Backup and exports", kinds=[
         ("products", "Products and prices"), ("valuation", "Stock valuation"), ("moves", "Stock movements"),
         ("purchases", "Purchase orders"), ("sales", "Sales with profit"), ("receivables", "Customers who owe")],
-        is_manager=request.user.is_staff))
+        is_manager=request.user.is_staff, can_backup=__import__("inventory.services.backup", fromlist=["x"]).is_sqlite()))

@@ -1,7 +1,8 @@
 # Render Blueprint: New > Blueprint > pick this repository.
-# Free plan: the service sleeps after 15 minutes idle and its disk is wiped on every restart, so demo data is
-# rebuilt at start (ALIFARIS_DEMO=1). For real use switch to a paid plan, add a disk and set ALIFARIS_DB_PATH
-# to a file on it, and set ALIFARIS_DEMO=0 (see README, Deploying).
+# The database is hosted PostgreSQL (Neon): paste its connection string into DATABASE_URL when Render asks.
+# Because the data lives in Neon, restarts and sleeping lose nothing. Demo data loads only into an EMPTY database
+# (ALIFARIS_DEMO=1); set ALIFARIS_DEMO=0 once real data goes in. The free plan still sleeps after 15 minutes idle.
+# Without DATABASE_URL the app falls back to SQLite on the (temporary) disk.
 services:
   - type: web
     name: alifaris-demo
@@ -13,6 +14,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.5
+      - key: DATABASE_URL
+        sync: false
       - key: DJANGO_DEBUG
         value: "0"
       - key: DJANGO_SECRET_KEY
