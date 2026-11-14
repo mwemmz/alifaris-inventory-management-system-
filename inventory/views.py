@@ -13,10 +13,12 @@ from . import forms as f
 from .models import (SyncPeer, ApiToken, LandedCost, Location, OperationType, Picking, Product, Scrap, StockMove, StockQuant,
                      ZraConfig, ZraLog)
 from .services import importer, stock, sync as sync_service, zra
-from .permissions import editor_required, post_needs_editor, can_edit
+from .permissions import (WM_CONFIG_KEYS, can_edit, can_manage_stock, editor_required, is_warehouse_manager,
+                          post_needs_editor)
 from .services.stock import StockError
 
 staff_required = user_passes_test(lambda u: u.is_active and u.is_staff, login_url="login")
+stock_manager_required = user_passes_test(can_manage_stock, login_url="login")
 
 OPS = {"receipts": OperationType.RECEIPT, "deliveries": OperationType.DELIVERY, "internal": OperationType.INTERNAL}
 OP_TITLES = {"receipts": "Receipts", "deliveries": "Deliveries", "internal": "Internal Transfers"}
@@ -24,7 +26,8 @@ OP_TITLES = {"receipts": "Receipts", "deliveries": "Deliveries", "internal": "In
 
 def ctx(request, **extra):
     base = {"company": settings.COMPANY_NAME, "unread": 2, "site_code": settings.SITE_CODE,
-            "can_edit": can_edit(request.user)}
+            "can_edit": can_edit(request.user), "can_manage_stock": can_manage_stock(request.user),
+            "is_warehouse_manager": is_warehouse_manager(request.user)}
     base.update(extra)
     return base
 
@@ -52,6 +55,23 @@ def overview(request):
     low = len(stock.replenishment_candidates())
     return render(request, "inventory/overview.html", ctx(request, cards=cards, low=low,
                                                           products=Product.objects.filter(active=True).count()))
+
+
+# ---------------------------------------------------------------- warehouse manager screen
+@stock_manager_required
+def warehouse(request):
+    """One screen for the warehouse manager: what is waiting, what is low, where the stock sits, what moved."""
+    waiting = []
+    for slug, code in OPS.items():
+        qs = Picking.objects.filter(op_type__code=code, state=Picking.DRAFT).select_related("source", "dest").order_by("-id")
+        waiting.append({"title": OP_TITLES[slug], "slug": slug, "count": qs.count(), "recent": list(qs[:5])})
+    low = sorted(stock.replenishment_candidates(), key=lambda r: r["on_hand"] - r["min"])
+    by_location = (StockQuant.objects.filter(location__usage=Location.INTERNAL, qty__gt=0)
+                   .values("location__name").annotate(items=Count("product"), units=Sum("qty")).order_by("-units"))
+    moves = StockMove.objects.select_related("product", "source", "dest", "picking__op_type")[:15]
+    return render(request, "inventory/warehouse.html", ctx(
+        request, waiting=waiting, low=low[:12], low_total=len(low), by_location=by_location, moves=moves,
+        out_of_stock=sum(1 for r in low if r["on_hand"] <= 0), products=Product.objects.filter(active=True).count()))
 
 
 # ---------------------------------------------------------------- operations
@@ -341,20 +361,24 @@ def report_valuation(request):
 
 
 # ---------------------------------------------------------------- configuration
-@staff_required
-def crud_list(request, key):
+def _crud_model(request, key):
+    """Managers may open every list; a warehouse manager only the stock-related ones."""
     model, fields, title = f.CRUD.get(key) or (None, None, None)
-    if not model:
+    if not model or (not request.user.is_staff and key not in WM_CONFIG_KEYS):
         raise Http404
+    return model, fields, title
+
+
+@stock_manager_required
+def crud_list(request, key):
+    model, fields, title = _crud_model(request, key)
     rows = [([str(o)], f"/inventory/config/{key}/{o.pk}/") for o in model.objects.all()]
     return table(request, title, ["Name"], rows, new_url=f"/inventory/config/{key}/new/")
 
 
-@staff_required
+@stock_manager_required
 def crud_edit(request, key, pk=None):
-    model, fields, title = f.CRUD.get(key) or (None, None, None)
-    if not model:
-        raise Http404
+    model, fields, title = _crud_model(request, key)
     obj = get_object_or_404(model, pk=pk) if pk else None
     form = f.crud_form(model, fields)(request.POST or None, instance=obj)
     if form.is_valid():
@@ -391,7 +415,7 @@ def tokens(request):
 
 
 # ---------------------------------------------------------------- import
-@staff_required
+@stock_manager_required
 def import_products(request):
     form = f.ImportForm(request.POST or None, request.FILES or None)
     result = None

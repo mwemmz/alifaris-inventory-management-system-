@@ -14,7 +14,7 @@
 {% if reorder %}<p><button class="btn primary">Create draft receipt for ticked items</button> <small>Creates a draft only. Stock changes when you validate it.</small></p>{% endif %}</form>
 <div class="card"><h3>Slow stock <small>on the shelf, nothing sold in 60 days</small></h3>
 <table class="t"><tr><th>Product</th><th class="r">On hand</th><th class="r">Tied up (cost)</th></tr>{% for r in dead %}<tr><td>{{ r.p.internal_ref }} {{ r.p.name }}</td><td class="r">{{ r.on_hand|floatformat:"-3" }}</td><td class="r">{{ r.value|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">None.</td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Ask your data</h3>
+{% if request.user.is_staff %}<div class="card"><h3>Ask your data</h3>
 <p><small>Ask in plain English. Answers come straight from your database, with no outside service.{% if ai_on %} Questions it cannot match are passed to Claude as totals only.{% endif %}</small></p>
 <div style="display:flex;gap:8px"><input id="askq" placeholder="e.g. top products last month" autocomplete="off"><button class="btn primary" id="askb">Ask</button></div>
 <div id="aska" style="margin-top:10px"></div>
@@ -26,5 +26,5 @@ fetch('{% url "bi:ask" %}',{method:'POST',headers:{'X-CSRFToken':c?c[1]:''},body
 var h='<p><b>'+esc(d.answer||d.error)+'</b></p>';if(d.table&&d.table.rows.length){h+='<table class="t"><tr>'+d.table.cols.map(function(x){return'<th>'+esc(x)+'</th>'}).join('')+'</tr>'+d.table.rows.map(function(r){return'<tr>'+r.map(function(x){return'<td>'+esc(x)+'</td>'}).join('')+'</tr>'}).join('')+'</table>'}a.innerHTML=h}).catch(function(){a.textContent='Could not reach the server.'})}
 document.getElementById('askb').onclick=ask;document.getElementById('askq').onkeydown=function(e){if(e.key==='Enter')ask()};
 document.querySelectorAll('.ex').forEach(function(x){x.onclick=function(e){e.preventDefault();document.getElementById('askq').value=x.textContent;ask()}});
-</script></div>
+</script></div>{% endif %}
 {% endblock %}

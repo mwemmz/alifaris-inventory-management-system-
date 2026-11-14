@@ -6,6 +6,7 @@ app_name = "inventory"
 
 urlpatterns = [
     path("", v.overview, name="overview"),
+    path("warehouse/", v.warehouse, name="warehouse"),
     path("operations/<slug:kind>/", v.picking_list, name="picking_list"),
     path("operations/<slug:kind>/new/", v.picking_new, name="picking_new"),
     path("transfer/<int:pk>/", v.picking_detail, name="picking_detail"),

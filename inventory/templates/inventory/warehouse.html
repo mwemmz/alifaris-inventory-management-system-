@@ -1,0 +1,46 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Warehouse</h1><div class="sub">{{ site_code }} &middot; {{ products }} active products</div></div>
+{% if out_of_stock %}<div class="msg warning">{{ out_of_stock }} product(s) are out of stock. <a href="{% url 'inventory:replenishment' %}">See replenishment</a></div>{% endif %}
+<div class="cards">
+  {% for w in waiting %}
+  <section class="card">
+    <h2>{{ w.title }}</h2><div class="sub">Waiting to be validated</div>
+    <div class="stats"><div><b>{{ w.count }}</b><span>Draft</span></div></div>
+    <a class="btn" href="{% url 'inventory:picking_list' w.slug %}">Open</a>
+    <a class="btn ghost" href="{% url 'inventory:picking_new' w.slug %}">New</a>
+  </section>
+  {% endfor %}
+  <section class="card">
+    <h2>Low stock</h2><div class="sub">Below reorder minimum</div>
+    <div class="stats"><div><b>{{ low_total }}</b><span>Products</span></div></div>
+    <a class="btn" href="{% url 'inventory:replenishment' %}">Replenish</a>
+    <a class="btn ghost" href="{% url 'inventory:physical_inventory' %}">Count stock</a>
+  </section>
+</div>
+
+<h2 class="sec">Most below their minimum</h2>
+{% if low %}
+<table class="t"><tr><th>Product</th><th class="r">On hand</th><th class="r">Minimum</th><th class="r">To order</th></tr>
+{% for r in low %}<tr><td><a href="{% url 'inventory:product_edit' r.product.pk %}">{{ r.product }}</a></td><td class="r">{{ r.on_hand|floatformat:"-2" }}</td><td class="r">{{ r.min|floatformat:"-2" }}</td><td class="r">{{ r.to_order|floatformat:"-2" }}</td></tr>{% endfor %}
+</table>
+{% if low_total > low|length %}<p class="muted">Showing {{ low|length }} of {{ low_total }}. <a href="{% url 'inventory:replenishment' %}">See all</a></p>{% endif %}
+{% else %}<p class="muted">Nothing is below its reorder minimum.</p>{% endif %}
+
+<h2 class="sec">Drafts waiting</h2>
+{% for w in waiting %}{% if w.recent %}
+<h3>{{ w.title }}</h3>
+<table class="t"><tr><th>Reference</th><th>From</th><th>To</th></tr>
+{% for p in w.recent %}<tr><td><a href="{% url 'inventory:picking_detail' p.pk %}">{{ p.ref }}</a></td><td>{{ p.source }}</td><td>{{ p.dest }}</td></tr>{% endfor %}
+</table>{% endif %}{% endfor %}
+
+<h2 class="sec">Stock by location</h2>
+<table class="t"><tr><th>Location</th><th class="r">Products</th><th class="r">Units</th></tr>
+{% for l in by_location %}<tr><td>{{ l.location__name }}</td><td class="r">{{ l.items }}</td><td class="r">{{ l.units|floatformat:"-2" }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No stock recorded yet.</td></tr>{% endfor %}
+</table>
+
+<h2 class="sec">Latest movements</h2>
+<table class="t"><tr><th>Date</th><th>Product</th><th>Type</th><th>From</th><th>To</th><th class="r">Qty</th></tr>
+{% for m in moves %}<tr><td>{{ m.date|date:"d M H:i" }}</td><td>{{ m.product }}</td><td>{{ m.kind }}</td><td>{{ m.source }}</td><td>{{ m.dest }}</td><td class="r">{{ m.qty|floatformat:"-2" }}</td></tr>{% empty %}<tr><td colspan="6" class="muted">No movements yet.</td></tr>{% endfor %}
+</table>
+{% endblock %}

@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from inventory.models import Product, ProductCategory
+from inventory.permissions import can_manage_stock
 from inventory.services import stock
 from . import insights
 from inventory.models import OperationType, Location
@@ -128,7 +129,7 @@ def sales(request):
 
 @login_required
 def stock_view(request):
-    if not request.user.is_staff:
+    if not can_manage_stock(request.user):
         return redirect("/")
     g = request.GET
     qs = Product.objects.filter(active=True).select_related("category")
@@ -173,7 +174,7 @@ def stock_view(request):
 
 @login_required
 def insights_view(request):
-    if not request.user.is_staff:
+    if not can_manage_stock(request.user):
         return redirect("/")
     hist, future = insights.forecast()
     return render(request, "bi/insights.html", {
@@ -212,7 +213,7 @@ def ask_view(request):
 @require_POST
 def draft_order(request):
     """Turn the reorder suggestions into one DRAFT receipt. Nothing moves until someone validates it."""
-    if not request.user.is_staff:
+    if not can_manage_stock(request.user):
         return redirect("/")
     from inventory.services import stock
     chosen = set(request.POST.getlist("pick"))

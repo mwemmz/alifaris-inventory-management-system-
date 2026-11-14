@@ -37,3 +37,5 @@ body.login{display:flex;align-items:center;justify-content:center}
 .login-box h1{font-size:15px;color:var(--char);letter-spacing:1.5px;text-transform:uppercase;padding:18px 26px 4px;margin:0}
 .login-box .btn{width:100%;background:var(--red)}.login-box .btn:hover{background:var(--red-dark)}
 .login-box input:focus{outline:2px solid #e8a3a8;border-color:var(--red)}
+
+.sec{font-size:15px;margin:26px 0 8px;color:var(--char)}.muted{color:#6b6e72}

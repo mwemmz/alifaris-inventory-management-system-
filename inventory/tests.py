@@ -264,6 +264,8 @@ class Roles(Base):
         k = U.objects.create_user("keeper", password="pw")
         from django.contrib.auth.models import Group
         k.groups.add(Group.objects.get(name="Storekeeper"))
+        wm = U.objects.create_user("wh", password="pw")
+        wm.groups.add(Group.objects.get(name="Warehouse Manager"))
         self.receive(5)
 
     def login(self, name):
@@ -284,6 +286,30 @@ class Roles(Base):
         self.assertEqual(self.p.name, "Tyre")
         r = self.client.post("/inventory/physical-inventory/", {"location": self.stock.pk, f"count_{self.p.pk}": "99"})
         self.assertEqual(self.p.on_hand, 5)
+
+    def test_warehouse_manager_scope(self):
+        self.login("wh")
+        # can operate like a storekeeper
+        self.assertEqual(self.client.get("/inventory/operations/receipts/new/").status_code, 200)
+        # has the warehouse screen, stock configuration and import
+        self.assertEqual(self.client.get("/inventory/warehouse/").status_code, 200)
+        self.assertEqual(self.client.get("/inventory/config/locations/").status_code, 200)
+        self.assertEqual(self.client.get("/inventory/config/warehouses/new/").status_code, 200)
+        self.assertEqual(self.client.get("/inventory/import/").status_code, 200)
+        self.assertEqual(self.client.get("/bi/stock/").status_code, 200)
+        self.assertEqual(self.client.get("/bi/insights/").status_code, 200)
+        # but not ZRA settings, tokens, site sync, sync peers or sales reports
+        for url in ["/inventory/config/zra/", "/inventory/config/api-tokens/", "/inventory/config/sync/",
+                    "/inventory/config/sync-peers/"]:
+            self.assertNotEqual(self.client.get(url).status_code, 200, url)
+        for url in ["/bi/", "/bi/sales/"]:
+            self.assertEqual(self.client.get(url).status_code, 302, url)
+
+    def test_warehouse_screen_closed_to_others(self):
+        for name in ["viewer", "keeper"]:
+            self.login(name)
+            self.assertEqual(self.client.get("/inventory/warehouse/").status_code, 302, name)
+            self.assertEqual(self.client.get("/inventory/config/locations/").status_code, 302, name)
 
     def test_storekeeper_can_operate_but_not_configure(self):
         self.login("keeper")

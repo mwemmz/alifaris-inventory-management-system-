@@ -31,5 +31,6 @@ class Command(BaseCommand):
         Partner.objects.get_or_create(name="Walk-in customer", defaults=dict(is_customer=True))
         ZraConfig.get()
         Group.objects.get_or_create(name="Storekeeper")
+        Group.objects.get_or_create(name="Warehouse Manager")
         Group.objects.get_or_create(name="Cashier")
         self.stdout.write(self.style.SUCCESS("Inventory defaults are in place."))

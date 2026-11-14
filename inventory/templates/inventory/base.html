@@ -30,7 +30,8 @@
       <a href="{% url 'inventory:report_analysis' %}">Moves Analysis</a>
       <a href="{% url 'inventory:report_valuation' %}">Valuation</a>
     </div></div>
-    {% if request.user.is_staff %}
+    {% if can_manage_stock %}<a href="{% url 'inventory:warehouse' %}">Warehouse</a>{% endif %}
+    {% if can_manage_stock %}
     <div class="dd"><button type="button">Configuration</button><div class="dd-menu">
       <h6>Warehouse Management</h6>
       <a href="{% url 'inventory:crud_list' 'warehouses' %}">Warehouses</a>
@@ -42,9 +43,11 @@
       <a href="{% url 'inventory:crud_list' 'uoms' %}">Units of Measure</a>
       <h6>Other</h6>
       <a href="{% url 'inventory:crud_list' 'partners' %}">Contacts</a>
+      {% if request.user.is_staff %}
       <a href="{% url 'inventory:zra_settings' %}">ZRA Smart Invoice</a>
       <a href="{% url 'inventory:tokens' %}">POS API tokens</a>
       <a href="{% url 'inventory:sync' %}">Site sync</a>
+      {% endif %}
     </div></div>
     <a href="{% url 'inventory:import' %}">Import Products</a>
     {% endif %}

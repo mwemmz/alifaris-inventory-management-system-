@@ -72,6 +72,7 @@ Stock quantities are never copied directly; they are always rebuilt from moves.
 ## Roles
 
 - **Staff users** (managers): everything, including Configuration, Import and ZRA settings.
+- **Warehouse Manager group** (created by `seed_inventory`): everything a storekeeper can do, plus the **Warehouse** screen (drafts waiting, low stock, stock by location, latest movements), warehouses, locations, categories, units and contacts, product import, the Stock and Insights reports and reorder drafts. Not sales reports, ZRA settings, API tokens, site sync or user admin.
 - **Storekeeper group** (created by `seed_inventory`): record receipts, deliveries, transfers, counts, scrap and edit products.
 - **Any other logged-in user**: view only.
 
