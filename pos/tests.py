@@ -186,3 +186,100 @@ class ViewAndSync(PosBase):
         self.assertEqual(services.import_remote_orders([row]), 0)
         self.assertEqual(self.p.on_hand, before)
         self.assertTrue(PosOrder.objects.get(number="BR2/POS/000001").remote)
+
+
+class ProfitTests(PosBase):
+    def test_line_keeps_the_cost_at_the_time_of_sale(self):
+        self.p.cost = Decimal("60")
+        self.p.save()
+        order, _ = self.sell(2)
+        self.p.cost = Decimal("90")  # cost changes later; the old sale must not
+        self.p.save()
+        line = order.lines.get()
+        self.assertEqual(line.unit_cost, Decimal("60.00"))
+        boss = self.boss
+        self.client.force_login(boss)
+        r = self.client.get("/bi/sales/")
+        self.assertEqual(r.status_code, 200)
+        # 200 incl. VAT, VAT 27.59, cost 2 x 60 = 120 -> margin 52.41
+        self.assertEqual(r.context["kpi"]["cost"], Decimal("120.00"))
+        self.assertEqual(r.context["kpi"]["margin"], Decimal("52.41"))
+
+    def test_refund_reverses_the_same_cost(self):
+        self.p.cost = Decimal("60")
+        self.p.save()
+        order, _ = self.sell(1)
+        services.open_session(self.boss, self.wh, 0)
+        refund = services.refund_order(order, self.boss, "test")
+        self.assertEqual(refund.lines.get().unit_cost, Decimal("60.00"))
+
+
+class ReceivablesTests(PosBase):
+    def setUp(self):
+        super().setUp()
+        from inventory.models import Partner
+        self.cust = Partner.objects.create(name="Kabwe Haulage", is_customer=True)
+        self.client.force_login(self.boss)
+
+    def on_account(self, qty=1, customer=None):
+        return services.create_sale(self.session, self.cashier, [{"product": self.p.pk, "qty": qty}],
+                                    [{"method": "credit", "amount": 100 * qty}], customer=customer or self.cust)
+
+    def test_credit_sale_needs_a_customer_record(self):
+        with self.assertRaises(PosError):
+            services.create_sale(self.session, self.cashier, [{"product": self.p.pk, "qty": 1}],
+                                 [{"method": "credit", "amount": 100}], customer_name="Someone")
+
+    def test_balance_payment_and_refund(self):
+        from . import receivables
+        self.on_account(2)
+        self.assertEqual(receivables.balance(self.cust), Decimal("200.00"))
+        receivables.record_payment(self.cust, 50, "cash", self.boss)
+        self.assertEqual(receivables.balance(self.cust), Decimal("150.00"))
+        order, _ = self.on_account(1)
+        services.open_session(self.boss, self.wh, 0)
+        services.refund_order(order, self.boss, "returned")
+        self.assertEqual(receivables.balance(self.cust), Decimal("150.00"))
+        rows = receivables.statement(self.cust)
+        self.assertEqual(rows[-1]["balance"], Decimal("150.00"))
+
+    def test_overpaying_is_refused(self):
+        from . import receivables
+        self.on_account(1)
+        with self.assertRaises(PosError):
+            receivables.record_payment(self.cust, 500, "cash", self.boss)
+
+    def test_credit_limit_stops_the_sale_and_nothing_is_saved(self):
+        self.cust.credit_limit = Decimal("150")
+        self.cust.save()
+        self.on_account(1)
+        before = PosOrder.objects.count()
+        with self.assertRaises(PosError):
+            self.on_account(1)
+        self.assertEqual(PosOrder.objects.count(), before)
+        self.assertEqual(self.p.on_hand, 9)
+
+    def test_payments_clear_the_oldest_sale_first_for_aging(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from . import receivables
+        old, _ = self.on_account(1)
+        PosOrder.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=70))
+        self.on_account(1)
+        receivables.record_payment(self.cust, 100, "cash", self.boss)
+        buckets = {a["label"]: a["amount"] for a in receivables.aging(self.cust)}
+        self.assertEqual(buckets["61-90 days"], Decimal("0"))
+        self.assertEqual(buckets["0-30 days"], Decimal("100.00"))
+
+    def test_screens_and_payment_form(self):
+        self.on_account(1)
+        self.assertEqual(self.client.get("/pos/customers/").status_code, 200)
+        url = f"/pos/customers/{self.cust.pk}/"
+        self.assertEqual(self.client.get(url).status_code, 200)
+        r = self.client.post(url, {"action": "payment", "amount": "40", "method": "mobile", "reference": "M123"})
+        self.assertEqual(r.status_code, 302)
+        from . import receivables
+        self.assertEqual(receivables.balance(self.cust), Decimal("60.00"))
+        self.client.logout()
+        self.client.force_login(self.cashier)
+        self.assertEqual(self.client.get("/pos/customers/").status_code, 302)

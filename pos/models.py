@@ -83,6 +83,7 @@ class PosOrderLine(models.Model):
     name = models.CharField(max_length=200)
     qty = models.DecimalField(**QTY)
     unit_price = models.DecimalField(**MONEY)
+    unit_cost = models.DecimalField(default=0, **MONEY)  # the product's average cost at the moment of sale
     discount_pct = models.DecimalField(default=0, max_digits=5, decimal_places=2)
     tax_type = models.CharField(max_length=3, default="A")
     tax_amount = models.DecimalField(default=0, **MONEY)
@@ -96,3 +97,24 @@ class PosPayment(models.Model):
     order = models.ForeignKey(PosOrder, on_delete=models.CASCADE, related_name="payments")
     method = models.CharField(max_length=10, choices=METHODS)
     amount = models.DecimalField(**MONEY)
+
+
+class CustomerPayment(models.Model):
+    """Money received from a customer against what they owe on account."""
+    METHODS = [(PosPayment.CASH, "Cash"), (PosPayment.CARD, "Card"), (PosPayment.MOBILE, "Mobile money"),
+               (PosPayment.BANK, "Bank transfer")]
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    customer = models.ForeignKey(Partner, on_delete=models.PROTECT, related_name="payments_received")
+    amount = models.DecimalField(**MONEY)
+    method = models.CharField(max_length=10, choices=METHODS, default=PosPayment.CASH)
+    reference = models.CharField(max_length=60, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+    paid_at = models.DateTimeField(default=timezone.now, db_index=True)
+    received_by = models.CharField(max_length=80, blank=True)
+    site_code = models.CharField(max_length=10, default=settings.SITE_CODE)
+
+    class Meta:
+        ordering = ["-paid_at", "-id"]
+
+    def __str__(self):
+        return f"{self.customer} paid {self.amount}"

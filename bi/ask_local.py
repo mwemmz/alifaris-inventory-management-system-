@@ -99,7 +99,7 @@ def answer(question):
     t = q.lower()
     d1, d2, label = parse_range(q)
     cat = find_category(q)
-    cost = ExpressionWrapper(F("qty") * F("product__cost"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    cost = ExpressionWrapper(F("qty") * F("unit_cost"), output_field=DecimalField(max_digits=18, decimal_places=2))
     scope = f" in {cat.name}" if cat else ""
 
     if has(t, "out of stock", "zero stock", "no stock", "finished"):
@@ -160,7 +160,7 @@ def answer(question):
 
     if has(t, "department", "categor") and not cat:
         qs = _lines(d1, d2).values("product__category__name").annotate(t=Sum("line_total"), c=Sum(cost)).order_by("-t")
-        return {"answer": f"Sales by department for {label}.", "table": {"cols": ["Department", "Sales", "Est. margin"], "rows": [[r["product__category__name"] or "Uncategorised", money(r["t"]), money((r["t"] or 0) - (r["c"] or 0))] for r in qs]}}
+        return {"answer": f"Sales by department for {label}.", "table": {"cols": ["Department", "Sales", "Margin"], "rows": [[r["product__category__name"] or "Uncategorised", money(r["t"]), money((r["t"] or 0) - (r["c"] or 0))] for r in qs]}}
 
     if has(t, "top", "best", "most sold", "most popular", "fast moving", "worst", "least", "slowest", "bottom"):
         bottom = has(t, "worst", "least", "slowest", "bottom")
@@ -190,7 +190,7 @@ def answer(question):
         total, tax, c = a["t"] or 0, a["tax"] or 0, a["c"] or 0
         what = f" of '{term}'" if prods else ""
         return {"answer": f"Sales{what}{scope} for {label}: {money(total)} incl. VAT from {a['n']} order(s), {a['u'] or 0:.0f} unit(s). "
-                          f"Excluding VAT {money(total - tax)}; estimated margin {money(total - tax - c)} (uses current costs).", "table": None}
+                          f"Excluding VAT {money(total - tax)}; margin {money(total - tax - c)} (cost as recorded at the time of each sale).", "table": None}
 
     if prods:
         return {"answer": f"{len(prods)} product(s) match '{term}'.", "table": {"cols": ["Ref", "Product", "Price", "On hand"], "rows": [[p.internal_ref, p.name, money(p.price), f"{p.on_hand:.0f}" if p.tracks_stock else "service"] for p in prods]}}

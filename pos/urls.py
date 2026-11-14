@@ -17,4 +17,6 @@ urlpatterns = [
     path("orders/<int:pk>/refund/", views.refund, name="refund"),
     path("zra/flush/", views.zra_flush, name="zra_flush"),
     path("report/", views.report, name="report"),
+    path("customers/", views.customers, name="customers"),
+    path("customers/<int:pk>/", views.customer_statement, name="customer_statement"),
 ]

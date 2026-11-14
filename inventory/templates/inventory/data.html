@@ -1,0 +1,15 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Backup and exports</h1></div>
+<div class="sheet">
+  <h3>Excel exports</h3>
+  <p class="note">Each file opens in Excel or Google Sheets. Sales takes optional dates: add <code>?from=2026-11-01&amp;to=2026-11-30</code> to its link.</p>
+  <ul>{% for key, label in kinds %}{% if is_manager or key != 'sales' and key != 'receivables' %}<li><a href="{% url 'inventory:export' key %}">{{ label }}</a></li>{% endif %}{% endfor %}</ul>
+  {% if is_manager %}
+  <h3>Database backup</h3>
+  <p class="note">A full copy of everything: products, stock, sales, customers, users. Keep copies somewhere other than this computer. Restoring is done by replacing the database file.</p>
+  <p><a class="btn" href="{% url 'inventory:backup' %}">Download backup now</a></p>
+  <p class="note">Automatic daily backups: schedule <code>python manage.py backup_db --to backups --keep 14</code> on the server.</p>
+  {% endif %}
+</div>
+{% endblock %}

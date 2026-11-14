@@ -1,0 +1,13 @@
+{% extends "pos/base.html" %}
+{% block page %}
+<h2>Customers on account</h2>
+<div class="cards"><div class="card"><b>{{ total|floatformat:2 }}</b><br>owed in total</div><div class="card"><b>{{ overdue|floatformat:2 }}</b><br>older than 30 days</div><div class="card"><b>{{ rows|length }}</b><br>customers owe money</div></div>
+<table class="t"><tr><th>Customer</th><th class="r">Owes</th><th class="r">Credit limit</th><th class="r">Oldest unpaid</th><th></th></tr>
+{% for r in rows %}<tr><td><a href="{% url 'pos:customer_statement' r.customer.pk %}">{{ r.customer.name }}</a></td>
+<td class="r">{{ r.balance|floatformat:2 }}</td>
+<td class="r">{% if r.limit %}{{ r.limit|floatformat:2 }}{% else %}none{% endif %}</td>
+<td class="r {% if r.oldest_days > 30 %}neg{% endif %}">{{ r.oldest_days }} day{{ r.oldest_days|pluralize }}</td>
+<td>{% if r.over_limit %}<span class="tag">over limit</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5">Nobody owes anything. A sale becomes a debt when the cashier chooses a customer and pays "On account".</td></tr>{% endfor %}</table>
+<p><small>Credit limits are set on each customer's statement page (or under Contacts in Inventory). A limit of 0 means no limit.</small></p>
+{% endblock %}

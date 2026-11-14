@@ -406,9 +406,207 @@ class DemoSeed(TestCase):
             self.assertTrue(self.client.login(username="manager", password="pw-for-tests-1"))
             self.assertEqual(self.client.get("/bi/").status_code, 200)
             self.assertEqual(self.client.get("/inventory/warehouse/").status_code, 200)
+            from .models import AuditLog, PurchaseOrder
+            from pos import receivables
+            self.assertEqual(set(PurchaseOrder.objects.values_list("state", flat=True)), {"received", "confirmed", "draft"})
+            self.assertTrue(receivables.summary())
+            self.assertTrue(AuditLog.objects.exists())
+            for url in ("/pos/customers/", "/inventory/purchase/", "/inventory/audit/", "/inventory/data/"):
+                self.assertEqual(self.client.get(url).status_code, 200, url)
             n = Product.objects.count()
             call_command("seed_demo", days=3, verbosity=0)  # second run must not duplicate anything
             self.assertEqual(Product.objects.count(), n)
 
     def test_health_check_needs_no_login(self):
         self.assertEqual(self.client.get("/healthz").status_code, 200)
+
+
+class AuditAndUsers(Base):
+    def setUp(self):
+        super().setUp()
+        U = get_user_model()
+        self.boss = U.objects.create_user("boss", password="pw", is_staff=True)
+        U.objects.create_user("viewer", password="pw")
+        self.client.force_login(self.boss)
+
+    def test_product_change_is_logged_with_old_and_new_price(self):
+        from .models import AuditLog
+        self.client.post(f"/inventory/products/{self.p.pk}/", {"name": "Tyre", "internal_ref": "T1", "product_type": "goods",
+                                                               "price": "250", "cost": "0", "tax_type": "A", "zra_item_type": "2",
+                                                               "active": "on", "min_qty": "0", "max_qty": "0", "secondary_price": "0"})
+        e = AuditLog.objects.filter(action="product changed").first()
+        self.assertIsNotNone(e)
+        self.assertEqual(e.username, "boss")
+        self.assertIn("price", e.detail)
+
+    def test_stock_validation_and_failed_login_are_logged(self):
+        from .models import AuditLog
+        self.receive(3)
+        pk = Picking.objects.create(op_type=OperationType.objects.get(code="receipt"), source=self.vend, dest=self.stock)
+        from .models import PickingLine
+        PickingLine.objects.create(picking=pk, product=self.p, qty=2)
+        self.client.post(f"/inventory/transfer/{pk.pk}/validate/")
+        self.assertTrue(AuditLog.objects.filter(action="stock validated").exists())
+        self.client.logout()
+        self.client.post("/login/", {"username": "boss", "password": "wrong"})
+        self.assertTrue(AuditLog.objects.filter(action="failed login", subject="boss").exists())
+
+    def test_audit_screen_is_for_managers_only(self):
+        self.assertEqual(self.client.get("/inventory/audit/").status_code, 200)
+        self.client.force_login(get_user_model().objects.get(username="viewer"))
+        self.assertEqual(self.client.get("/inventory/audit/").status_code, 302)
+        self.assertEqual(self.client.get("/inventory/users/").status_code, 302)
+
+    def test_create_user_with_role_and_change_it(self):
+        from django.contrib.auth.models import Group
+        r = self.client.post("/inventory/users/new/", {"username": "mary", "first_name": "Mary", "role": "cashier",
+                                                       "active": "on", "password": "a-long-pass-9"})
+        self.assertEqual(r.status_code, 302)
+        u = get_user_model().objects.get(username="mary")
+        self.assertTrue(u.check_password("a-long-pass-9"))
+        self.assertTrue(u.groups.filter(name="Cashier").exists())
+        self.client.post(f"/inventory/users/{u.pk}/", {"username": "mary", "role": "warehouse", "active": "on"})
+        u.refresh_from_db()
+        self.assertFalse(u.groups.filter(name="Cashier").exists())
+        self.assertTrue(u.groups.filter(name="Warehouse Manager").exists())
+        self.assertFalse(u.is_staff)
+
+    def test_cannot_lock_yourself_out_or_remove_last_manager(self):
+        r = self.client.post(f"/inventory/users/{self.boss.pk}/", {"username": "boss", "role": "cashier", "active": "on"})
+        self.boss.refresh_from_db()
+        self.assertTrue(self.boss.is_staff)
+        weak = self.client.post("/inventory/users/new/", {"username": "x", "role": "viewer", "active": "on", "password": "123"})
+        self.assertEqual(weak.status_code, 200)  # password rejected, form shown again
+        self.assertFalse(get_user_model().objects.filter(username="x").exists())
+
+
+class PurchaseAndData(Base):
+    def setUp(self):
+        super().setUp()
+        from .models import Partner
+        U = get_user_model()
+        self.boss = U.objects.create_user("boss2", password="pw", is_staff=True)
+        self.viewer = U.objects.create_user("viewer2", password="pw")
+        self.supplier = Partner.objects.create(name="Lusaka Tyres Ltd", is_supplier=True, is_customer=False)
+        self.client.force_login(self.boss)
+
+    def _order(self, qty="10", cost="80"):
+        from .models import PurchaseOrder, PurchaseOrderLine
+        po = PurchaseOrder.objects.create(supplier=self.supplier, created_by=self.boss)
+        PurchaseOrderLine.objects.create(order=po, product=self.p, qty=Decimal(qty), unit_cost=Decimal(cost))
+        return po
+
+    def test_order_number_and_total(self):
+        po = self._order("10", "80")
+        self.assertTrue(po.ref.startswith("PO"))
+        self.assertEqual(po.total, Decimal("800"))
+
+    def test_full_cycle_order_receive_validate_closes_order(self):
+        from .models import PurchaseOrder
+        po = self._order()
+        self.client.post(f"/inventory/purchase/{po.pk}/confirm/")
+        po.refresh_from_db()
+        self.assertEqual(po.state, PurchaseOrder.CONFIRMED)
+        r = self.client.post(f"/inventory/purchase/{po.pk}/receive/")
+        po.refresh_from_db()
+        self.assertIsNotNone(po.receipt)
+        self.assertEqual(po.receipt.origin, po.ref)
+        self.assertRedirects(r, f"/inventory/transfer/{po.receipt.pk}/")
+        self.assertEqual(self.p.on_hand, 0)
+        self.client.post(f"/inventory/transfer/{po.receipt.pk}/validate/")
+        po.refresh_from_db()
+        self.assertEqual(po.state, PurchaseOrder.RECEIVED)
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.on_hand, 10)
+        self.assertEqual(self.p.cost, 80)
+
+    def test_receive_twice_does_not_create_two_receipts(self):
+        from .models import Picking
+        po = self._order()
+        self.client.post(f"/inventory/purchase/{po.pk}/confirm/")
+        self.client.post(f"/inventory/purchase/{po.pk}/receive/")
+        self.client.post(f"/inventory/purchase/{po.pk}/receive/")
+        self.assertEqual(Picking.objects.filter(origin=po.ref).count(), 1)
+
+    def test_empty_order_cannot_be_placed(self):
+        from .models import PurchaseOrder
+        po = PurchaseOrder.objects.create(supplier=self.supplier)
+        self.client.post(f"/inventory/purchase/{po.pk}/confirm/")
+        po.refresh_from_db()
+        self.assertEqual(po.state, PurchaseOrder.DRAFT)
+
+    def test_cancel_also_cancels_open_receipt(self):
+        po = self._order()
+        self.client.post(f"/inventory/purchase/{po.pk}/confirm/")
+        self.client.post(f"/inventory/purchase/{po.pk}/receive/")
+        self.client.post(f"/inventory/purchase/{po.pk}/cancel/")
+        po.refresh_from_db()
+        self.assertEqual(po.state, "cancel")
+        self.assertEqual(po.receipt.state, Picking.CANCEL)
+
+    def test_orders_from_replenishment(self):
+        from .models import PurchaseOrder
+        self.p.min_qty, self.p.max_qty = Decimal("5"), Decimal("20")
+        self.p.save()
+        r = self.client.post("/inventory/purchase/from-replenishment/", {"supplier": self.supplier.pk})
+        po = PurchaseOrder.objects.get()
+        self.assertEqual(po.lines.get().qty, Decimal("20"))
+        self.assertRedirects(r, f"/inventory/purchase/{po.pk}/")
+
+    def test_viewer_cannot_open_purchasing_or_backup(self):
+        self.client.force_login(self.viewer)
+        self.assertNotEqual(self.client.get("/inventory/purchase/").status_code, 200)
+        self.assertNotEqual(self.client.get("/inventory/data/backup/").status_code, 200)
+        self.assertEqual(self.client.get("/inventory/data/export/sales.xlsx").status_code, 404)
+
+    def test_audit_trail_of_purchasing(self):
+        from .models import AuditLog
+        po = self._order()
+        self.client.post(f"/inventory/purchase/{po.pk}/confirm/")
+        self.assertTrue(AuditLog.objects.filter(action="purchase order placed", subject=po.ref).exists())
+
+    def test_backup_command_copies_a_real_database_and_keeps_only_recent_files(self):
+        import os
+        import sqlite3
+        import subprocess
+        import sys
+        import tempfile
+        import time
+        from pathlib import Path
+        from django.conf import settings
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, ALIFARIS_DB_PATH=str(Path(d) / "live.sqlite3"), DJANGO_DEBUG="1")
+            run = lambda *args: subprocess.run([sys.executable, "manage.py", *args], cwd=settings.BASE_DIR, env=env,
+                                               capture_output=True, text=True, timeout=90)
+            self.assertEqual(run("migrate", "--noinput").returncode, 0)
+            self.assertEqual(run("seed_inventory").returncode, 0)
+            for _ in range(3):
+                r = run("backup_db", "--to", str(Path(d) / "bk"), "--keep", "2")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                time.sleep(1.1)
+            files = sorted((Path(d) / "bk").glob("*.sqlite3"))
+            self.assertEqual(len(files), 2)
+            con = sqlite3.connect(files[-1])
+            self.assertGreater(con.execute("select count(*) from inventory_location").fetchone()[0], 0)
+            con.close()
+
+    def test_manager_downloads_backup_and_exports(self):
+        import io as _io
+        from openpyxl import load_workbook
+        with mock.patch("inventory.services.backup.make_backup") as mk:
+            import tempfile
+            from pathlib import Path
+            f = Path(tempfile.mkdtemp()) / "x.sqlite3"
+            f.write_bytes(b"SQLite format 3\x00test")
+            mk.return_value = f
+            r = self.client.get("/inventory/data/backup/")
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(b"".join(r.streaming_content).startswith(b"SQLite format 3"))
+            self.assertIn("attachment", r["Content-Disposition"])
+        for kind in ("products", "valuation", "moves", "purchases", "sales", "receivables"):
+            r = self.client.get(f"/inventory/data/export/{kind}.xlsx")
+            self.assertEqual(r.status_code, 200, kind)
+            load_workbook(_io.BytesIO(r.content))
+        ws = load_workbook(_io.BytesIO(self.client.get("/inventory/data/export/products.xlsx").content)).active
+        self.assertEqual(ws["A1"].value, "Ref")
+        self.assertEqual(ws.max_row, 2)

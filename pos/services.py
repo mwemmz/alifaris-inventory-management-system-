@@ -11,6 +11,7 @@ from inventory.models import Location, OperationType, Partner, Product, ZraConfi
 from inventory.services import stock, zra
 from inventory.services.stock import StockError
 
+from . import receivables
 from .models import PosOrder, PosOrderLine, PosPayment, PosSession
 
 CENT = Decimal("0.01")
@@ -140,7 +141,7 @@ def create_sale(session, user, lines, payments, *, customer=None, customer_name=
             raise PosError(f"Discounts above {settings.POS_MAX_DISCOUNT_CASHIER}% need a manager.")
         line_total, tax = price_line(qty, price, disc, product.tax_type)
         PosOrderLine.objects.create(order=order, product=product, ref=product.internal_ref, name=product.name[:200],
-                                    qty=qty, unit_price=price, discount_pct=disc, tax_type=product.tax_type,
+                                    qty=qty, unit_price=price, unit_cost=product.cost, discount_pct=disc, tax_type=product.tax_type,
                                     tax_amount=tax, line_total=line_total)
         total += line_total
         tax_total += tax
@@ -156,8 +157,10 @@ def create_sale(session, user, lines, payments, *, customer=None, customer_name=
             continue
         if p["method"] not in dict(PosPayment.METHODS):
             raise PosError(f"Unknown payment method: {p['method']}")
-        if p["method"] == PosPayment.CREDIT and not (customer or customer_name):
-            raise PosError("Choose a customer for a sale on account.")
+        if p["method"] == PosPayment.CREDIT:
+            if not customer:
+                raise PosError("Choose a customer from the list for a sale on account, so what they owe can be tracked.")
+            receivables.check_limit(customer, amt)
         PosPayment.objects.create(order=order, method=p["method"], amount=amt)
         paid += amt
         if p["method"] == PosPayment.CASH:
@@ -205,7 +208,7 @@ def refund_order(original, user, reason=""):
     returns = []
     for ln in original.lines.select_related("product"):
         PosOrderLine.objects.create(order=order, product=ln.product, ref=ln.ref, name=ln.name, qty=-ln.qty,
-                                    unit_price=ln.unit_price, discount_pct=ln.discount_pct, tax_type=ln.tax_type,
+                                    unit_price=ln.unit_price, unit_cost=ln.unit_cost, discount_pct=ln.discount_pct, tax_type=ln.tax_type,
                                     tax_amount=-ln.tax_amount, line_total=-ln.line_total)
         if ln.product.tracks_stock:
             returns.append((ln.product, ln.qty))
@@ -324,9 +327,19 @@ def order_to_dict(o):
             "paid_total": str(o.paid_total), "change_due": str(o.change_due), "note": o.note,
             "created_at": o.created_at.isoformat(), "recorded_at": o.recorded_at.isoformat(), "site": o.site_code,
             "lines": [{"ref": l.ref, "name": l.name, "qty": str(l.qty), "unit_price": str(l.unit_price),
-                       "discount_pct": str(l.discount_pct), "tax_type": l.tax_type, "tax_amount": str(l.tax_amount),
+                       "unit_cost": str(l.unit_cost), "discount_pct": str(l.discount_pct), "tax_type": l.tax_type, "tax_amount": str(l.tax_amount),
                        "line_total": str(l.line_total)} for l in o.lines.all()],
             "payments": [{"method": p.method, "amount": str(p.amount)} for p in o.payments.all()]}
+
+
+def _match_customer(name, tpin):
+    """Link a sale from another site to the customer record here, so what they owe adds up across sites."""
+    qs = Partner.objects.filter(is_customer=True)
+    if tpin:
+        found = qs.filter(tpin=tpin).first()
+        if found:
+            return found
+    return qs.filter(name=name).first() if name else None
 
 
 @transaction.atomic
@@ -339,6 +352,7 @@ def import_remote_orders(rows):
         refund_of = PosOrder.objects.filter(uuid=r["refund_of"]).first() if r.get("refund_of") else None
         o = PosOrder.objects.create(
             uuid=r["uuid"], number=r["number"], kind=r["kind"], refund_of=refund_of, session=None,
+            customer=_match_customer(r.get("customer_name", ""), r.get("customer_tpin", "")),
             cashier_name=r["cashier"], customer_name=r.get("customer_name", ""), customer_tpin=r.get("customer_tpin", ""),
             price_tier=r.get("tier", "primary"), tax_total=r["tax_total"], discount_total=r["discount_total"],
             total=r["total"], paid_total=r["paid_total"], change_due=r["change_due"], note=r.get("note", ""),
@@ -346,7 +360,8 @@ def import_remote_orders(rows):
         for l in r["lines"]:
             product = Product.objects.get(internal_ref=l["ref"])
             PosOrderLine.objects.create(order=o, product=product, ref=l["ref"], name=l["name"], qty=l["qty"],
-                                        unit_price=l["unit_price"], discount_pct=l["discount_pct"],
+                                        unit_price=l["unit_price"], unit_cost=l.get("unit_cost") or product.cost,
+                                        discount_pct=l["discount_pct"],
                                         tax_type=l["tax_type"], tax_amount=l["tax_amount"], line_total=l["line_total"])
         for p in r["payments"]:
             PosPayment.objects.create(order=o, method=p["method"], amount=p["amount"])

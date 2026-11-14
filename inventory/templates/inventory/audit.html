@@ -1,0 +1,12 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp"><h1>Audit log</h1>
+  <form class="search" method="get"><input name="user" placeholder="User" value="{{ g.user }}"><input name="action" placeholder="Action" value="{{ g.action }}"><input name="q" placeholder="Search" value="{{ g.q }}"><button class="btn ghost">Filter</button></form>
+  <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&user={{ g.user }}&action={{ g.action }}&q={{ g.q }}">&lsaquo;</a>{% endif %}
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}&user={{ g.user }}&action={{ g.action }}&q={{ g.q }}">&rsaquo;</a>{% endif %}</span></div>
+<p class="note">Who did what, and when. Entries cannot be edited or deleted from the screens.</p>
+<table class="list"><thead><tr><th>When</th><th>Who</th><th>What</th><th>On</th><th>Detail</th><th>From</th></tr></thead><tbody>
+{% for e in page %}<tr><td>{{ e.created_at|date:"d M Y H:i" }}</td><td>{{ e.username }}</td><td>{{ e.action }}</td><td>{{ e.subject }}</td><td>{{ e.detail }}</td><td>{{ e.ip|default:"" }}</td></tr>
+{% empty %}<tr><td colspan="6" class="empty">Nothing recorded yet.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

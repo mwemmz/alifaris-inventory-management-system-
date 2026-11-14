@@ -15,6 +15,7 @@ from inventory.models import Product, ProductCategory
 from inventory.permissions import can_manage_stock
 from inventory.services import stock
 from . import insights
+from pos import receivables
 from inventory.models import OperationType, Location
 from pos.models import PosOrder, PosOrderLine
 
@@ -81,7 +82,7 @@ def sales(request):
     if g.get("pay"):
         lines = lines.filter(order__payments__method=g["pay"]).distinct()
 
-    cost = ExpressionWrapper(F("qty") * F("product__cost"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    cost = ExpressionWrapper(F("qty") * F("unit_cost"), output_field=DecimalField(max_digits=18, decimal_places=2))
     agg = dict(total=Sum("line_total"), units=Sum("qty"), tax=Sum("tax_amount"), cost=Sum(cost))
 
     def grouped(*fields, order="-total", limit=None):
@@ -109,7 +110,7 @@ def sales(request):
         resp = HttpResponse(content_type="text/csv")
         resp["Content-Disposition"] = f'attachment; filename="sales_{d_from}_{d_to}.csv"'
         w = csv.writer(resp)
-        w.writerow(["Ref", "Product", "Qty", "Sales incl VAT", "VAT", "Est. cost", "Est. margin"])
+        w.writerow(["Ref", "Product", "Qty", "Sales incl VAT", "VAT", "Cost", "Margin"])
         for r in by_product:
             w.writerow([r["ref"], r["name"], r["units"], r["total"], r["tax"], r["cost"], r["margin"]])
         return resp
@@ -286,6 +287,6 @@ def dashboard(request):
            "chart": {"days": days14, "hours": [[f"{r['h']:02d}:00", float(r["t"] or 0)] for r in hours],
                      "pays": [[labels.get(r["method"], r["method"]), float(r["t"] or 0)] for r in pays]},
            "top": top, "tills": tills, "flags": insights.anomalies()[:6], "reorder": len(insights.reorder_suggestions()),
-           "stock_value": value, "zra_on": zra_on, "zra_pending": mine.filter(zra_status="pending").count(),
+           "stock_value": value, "owed": receivables.total_owed(), "zra_on": zra_on, "zra_pending": mine.filter(zra_status="pending").count(),
            "zra_failed": mine.filter(zra_status="failed").count(), "peers": SyncPeer.objects.filter(active=True)}
     return render(request, "bi/dashboard.html", ctx)

@@ -18,12 +18,12 @@
 <div class="kpis">
  <div class="card"><b>{{ kpi.total|floatformat:2 }}</b><br>Sales incl. VAT</div>
  <div class="card"><b>{{ kpi.net|floatformat:2 }}</b><br>Sales excl. VAT</div>
- <div class="card"><b>{{ kpi.margin|floatformat:2 }}</b><br>Est. margin ({{ kpi.margin_pct }}%)</div>
+ <div class="card"><b>{{ kpi.margin|floatformat:2 }}</b><br>Margin ({{ kpi.margin_pct }}%)</div>
  <div class="card"><b>{{ kpi.orders }}</b><br>Orders</div>
  <div class="card"><b>{{ kpi.avg }}</b><br>Avg order</div>
  <div class="card"><b>{{ kpi.units|floatformat:"-0" }}</b><br>Units sold</div>
 </div>
-<p><small>Margin uses each product's <i>current</i> cost, so it is an estimate. Refunds count as negative sales. Filters on product, price or category analyse those lines only.</small></p>
+<p><small>Margin uses the cost recorded on each sale line at the time of the sale. Refunds count as negative sales. Filters on product, price or category analyse those lines only.</small></p>
 <div class="card"><h3>Sales over time</h3><div id="c-line"></div></div>
 <div class="grid2"><div class="card"><h3>Share by department</h3><div id="c-donut"></div></div><div class="card"><h3>Top 10 products</h3><div id="c-bar"></div></div></div>
 {{ chart|json_script:"chartdata" }}
@@ -34,6 +34,6 @@
 <h3>By site</h3><table class="t">{% for r in by_site %}<tr><td>{{ r.order__site_code }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td><td class="r">{{ r.total|floatformat:2 }}</td></tr>{% endfor %}</table></div>
 </div>
 <div class="card"><h3>Top products <a class="btn" style="float:right" href="?{{ request.GET.urlencode }}&export=csv">Export CSV</a></h3>
-<table class="t"><tr><th>Ref</th><th>Product</th><th class="r">Qty</th><th class="r">Sales</th><th class="r">Est. margin</th><th></th></tr>
+<table class="t"><tr><th>Ref</th><th>Product</th><th class="r">Qty</th><th class="r">Sales</th><th class="r">Margin</th><th></th></tr>
 {% for r in by_product %}<tr><td>{{ r.ref }}</td><td>{{ r.name }}</td><td class="r">{{ r.units|floatformat:"-3" }}</td><td class="r">{{ r.total|floatformat:2 }}</td><td class="r {% if r.margin < 0 %}neg{% endif %}">{{ r.margin|floatformat:2 }}</td><td class="b"><div class="bar" style="width:{{ r.pct }}%"></div></td></tr>{% endfor %}</table></div>
 {% endblock %}

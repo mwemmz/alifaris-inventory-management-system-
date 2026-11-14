@@ -17,8 +17,9 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from inventory.models import (Location, OperationType, Partner, Product, ProductCategory, StockMove, UoM, Warehouse)
+from inventory import audit
 from inventory.services import stock
-from pos import services as pos
+from pos import receivables, services as pos
 from pos.models import PosPayment
 
 # (ref, name, category, cost, price, on_hand, min, max, weight) ; weight = how often it sells (0 = never: slow stock)
@@ -97,6 +98,9 @@ class Command(BaseCommand):
         uom = UoM.objects.get(name="Units")
         suppliers = [Partner.objects.get_or_create(name=n, defaults=dict(is_supplier=True, is_customer=False))[0] for n in SUPPLIERS]
         customers = [Partner.objects.get_or_create(name=n, defaults=dict(tpin=t, is_customer=True))[0] for n, t in CUSTOMERS]
+        for c, limit in zip(customers, [20000, 12000, 8000]):  # the first few are account customers with a credit limit
+            c.credit_limit = Decimal(limit)
+            c.save(update_fields=["credit_limit"])
 
         products = []
         for ref, name, cat, cost, price, qty, mn, mx, weight in PRODUCTS:
@@ -148,6 +152,8 @@ class Command(BaseCommand):
                 gross = pos.money(total)
                 method = rng.choices([PosPayment.CASH, PosPayment.MOBILE, PosPayment.CARD], [6, 3, 1])[0]
                 cust = rng.choice(customers) if rng.random() < 0.18 else None
+                if cust and cust.credit_limit and rng.random() < 0.7:
+                    method = PosPayment.CREDIT  # account customers buy on credit
                 try:
                     order, _ = pos.create_sale(session, cashier, lines, [{"method": method, "amount": gross}],
                                                customer=cust, created_at=when)
@@ -176,15 +182,60 @@ class Command(BaseCommand):
             session.closed_at = opened + timedelta(hours=9)
             session.save(update_fields=["closed_at"])
 
+        # Customers settle part of what they owe
+        n_paid = 0
+        for i, c in enumerate(customers[:3]):
+            owed = receivables.balance(c)
+            if owed > 0:
+                receivables.record_payment(c, pos.money(owed * Decimal("0.4")), "bank", users["manager"], reference=f"TT-{1040 + i}",
+                                           paid_at=timezone.now() - timedelta(days=3 + i))
+                n_paid += 1
+
+        # Purchasing: one order received into stock, one on its way, one still being prepared
+        n_po = self._purchasing(suppliers, products, users)
+
         # A stock count the day before: a few shelves turn out lower than the books, so the demo has low and empty items.
         loc = Location.objects.filter(usage=Location.INTERNAL, warehouse=wh).first()
         counts = {Product.objects.get(internal_ref=r).pk: q for r, q in
                   [("ENG-006", 0), ("FIL-003", 4), ("ELE-004", 2), ("BRK-003", 6), ("OIL-001", 18), ("TRN-001", 3)]}
         stock.apply_count(loc, counts, reason="Physical inventory")
 
+        for user, action, subject, detail in [
+                ("manager", "product changed", "Brake pad set (front)", "price: 420.00 -> 450.00"),
+                ("manager", "user created", "cashier2", "role Cashier"),
+                ("manager", "export downloaded", "Sales", "demo"),
+                ("warehouse", "stock validated", "Opening stock", "demo")]:
+            audit.log(users[user], action, subject, detail)
         self.stdout.write(self.style.SUCCESS(
-            f"Demo data ready: {len(products)} products, {n_orders} sales, {n_refunds} refunds over {opts['days']} days."))
+            f"Demo data ready: {len(products)} products, {n_orders} sales, {n_refunds} refunds, {n_paid} customer payments, "
+            f"{n_po} purchase orders over {opts['days']} days."))
         self.stdout.write("Demo logins (password is ALIFARIS_DEMO_PASSWORD): " + ", ".join(f"{u} ({r})" for u, r in USERS))
+
+    @staticmethod
+    def _purchasing(suppliers, products, users):
+        from inventory.models import PurchaseOrder, PurchaseOrderLine
+        plans = [(PurchaseOrder.RECEIVED, 0, [(2, 12), (5, 20)], 10, 5), (PurchaseOrder.CONFIRMED, 1, [(1, 8), (7, 15), (9, 6)], 2, -3),
+                 (PurchaseOrder.DRAFT, 2, [(3, 10)], 0, -7)]
+        rcp = OperationType.objects.filter(code=OperationType.RECEIPT).first()
+        for state, si, picks, ago, due in plans:
+            po = PurchaseOrder.objects.create(supplier=suppliers[si % len(suppliers)], created_by=users["manager"],
+                                              order_date=timezone.localdate() - timedelta(days=ago),
+                                              expected_date=timezone.localdate() - timedelta(days=due))
+            for idx, qty in picks:
+                prod = products[idx % len(products)][0]
+                PurchaseOrderLine.objects.create(order=po, product=prod, qty=Decimal(qty), unit_cost=prod.cost)
+            if state == PurchaseOrder.DRAFT:
+                continue
+            po.state = PurchaseOrder.CONFIRMED
+            if state == PurchaseOrder.RECEIVED:
+                po.receipt = stock.new_picking(rcp, [(ln.product, ln.qty, ln.unit_cost) for ln in po.lines.all()],
+                                               partner=po.supplier, origin=po.ref, user=users["warehouse"])
+                stock.validate_picking(po.receipt)
+            po.save()
+            if po.receipt_id:
+                po.receipt.refresh_from_db()
+            po.sync()
+        return len(plans)
 
     @staticmethod
     def _sold_estimate(weight, days):

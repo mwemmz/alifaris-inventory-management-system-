@@ -143,6 +143,8 @@ class Partner(models.Model):
     phone = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
     tpin = models.CharField("TPIN", max_length=10, blank=True)
+    credit_limit = models.DecimalField(default=0, help_text="Most this customer may owe on account. 0 means no limit.",
+                                       **MONEY)
 
     class Meta:
         ordering = ["name"]
@@ -339,3 +341,76 @@ class SyncPeer(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class AuditLog(models.Model):
+    """Who did what, and when. Written by the screens that change money, stock, prices or access. Never edited."""
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    username = models.CharField(max_length=150, blank=True)
+    action = models.CharField(max_length=60, db_index=True)
+    subject = models.CharField(max_length=200, blank=True)
+    detail = models.TextField(blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    site_code = models.CharField(max_length=10, default=settings.SITE_CODE)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.username}: {self.action} {self.subject}"
+
+
+class PurchaseOrder(models.Model):
+    """What was ordered from a supplier. Receiving it creates a draft receipt; validating that receipt closes the order."""
+    DRAFT, CONFIRMED, RECEIVED, CANCEL = "draft", "confirmed", "received", "cancel"
+    STATES = [(DRAFT, "Draft"), (CONFIRMED, "Ordered"), (RECEIVED, "Received"), (CANCEL, "Cancelled")]
+
+    ref = models.CharField(max_length=30, blank=True, unique=True)
+    supplier = models.ForeignKey(Partner, on_delete=models.PROTECT, related_name="purchase_orders",
+                                 limit_choices_to={"is_supplier": True})
+    state = models.CharField(max_length=10, choices=STATES, default=DRAFT, db_index=True)
+    order_date = models.DateField(default=timezone.localdate)
+    expected_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    receipt = models.ForeignKey(Picking, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    site_code = models.CharField(max_length=10, default=settings.SITE_CODE)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.ref:
+            self.ref = f"PO{self.pk:05d}"
+            super().save(update_fields=["ref"])
+
+    @property
+    def total(self):
+        return sum((ln.subtotal for ln in self.lines.all()), Decimal("0"))
+
+    def sync(self):
+        """Close the order once its receipt has been validated."""
+        if self.state == self.CONFIRMED and self.receipt_id and self.receipt.state == Picking.DONE:
+            self.state = self.RECEIVED
+            self.save(update_fields=["state"])
+        return self.state
+
+    def __str__(self):
+        return self.ref or f"PO {self.pk}"
+
+
+class PurchaseOrderLine(models.Model):
+    order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="lines")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    qty = models.DecimalField(**QTY)
+    unit_cost = models.DecimalField("Unit cost", default=0, **MONEY)
+
+    @property
+    def subtotal(self):
+        return (self.qty or 0) * (self.unit_cost or 0)
+
+    def __str__(self):
+        return f"{self.product} x {self.qty}"

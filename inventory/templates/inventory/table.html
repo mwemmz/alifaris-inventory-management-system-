@@ -4,6 +4,9 @@
   {% if new_url %}<a class="btn" href="{{ new_url }}">{{ new_label }}</a>{% endif %}
   <h1>{{ title }}</h1>
   {% for a in actions %}<form method="post" class="inline">{% csrf_token %}<button class="btn ghost" type="submit">{{ a.label }}</button></form>{% endfor %}
+  {% if po_suppliers is not None %}<form method="post" action="{% url 'inventory:po_from_replenishment' %}" class="inline">{% csrf_token %}
+    <select name="supplier" required><option value="">Supplier...</option>{% for s in po_suppliers %}<option value="{{ s.pk }}">{{ s.name }}</option>{% endfor %}</select>
+    <button class="btn ghost" type="submit">Create purchase order</button></form>{% endif %}
   <form class="search" method="get"><input name="q" placeholder="Search..." value="{{ request.GET.q }}"></form>
   <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}
     {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">&lsaquo;</a>{% endif %}

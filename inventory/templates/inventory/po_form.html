@@ -1,0 +1,35 @@
+{% extends "inventory/base.html" %}
+{% block body %}
+<div class="cp">
+  <h1>Purchase Orders / {% if new %}New{% else %}{{ order.ref }}{% endif %}</h1>
+  {% if not new %}<span class="state {{ order.state }}">{{ order.get_state_display }}</span>
+    {% if order.state == 'draft' %}<form method="post" action="{% url 'inventory:po_action' order.pk 'confirm' %}" class="inline">{% csrf_token %}<button class="btn">Mark as ordered</button></form>{% endif %}
+    {% if order.state == 'confirmed' %}<form method="post" action="{% url 'inventory:po_action' order.pk 'receive' %}" class="inline">{% csrf_token %}<button class="btn">Receive goods</button></form>{% endif %}
+    {% if order.state == 'draft' or order.state == 'confirmed' %}<form method="post" action="{% url 'inventory:po_action' order.pk 'cancel' %}" class="inline">{% csrf_token %}<button class="btn ghost">Cancel</button></form>{% endif %}
+  {% endif %}
+</div>
+{% if editable %}
+<form method="post" class="sheet">{% csrf_token %}
+  {{ form.non_field_errors }}
+  <div class="two">{% for field in form %}<div class="field"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+  <h3>Products</h3>
+  {{ lines.management_form }}{{ lines.non_form_errors }}
+  <table class="list"><thead><tr><th>Product</th><th>Quantity</th><th>Unit cost</th><th>Remove</th></tr></thead><tbody>
+  {% for lf in lines %}<tr>{{ lf.id }}<td>{{ lf.product }}{{ lf.product.errors }}</td><td>{{ lf.qty }}{{ lf.qty.errors }}</td><td>{{ lf.unit_cost }}</td><td>{% if lf.instance.pk %}{{ lf.DELETE }}{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  <button class="btn" type="submit">Save</button>
+</form>
+{% else %}
+<div class="sheet">
+  <div class="two">
+    <p><b>Supplier:</b> {{ order.supplier }}</p><p><b>Ordered:</b> {{ order.order_date|date:"Y-m-d" }}</p>
+    <p><b>Expected:</b> {{ order.expected_date|date:"Y-m-d"|default:"-" }}</p>
+    <p><b>Receipt:</b> {% if order.receipt %}<a href="{% url 'inventory:picking_detail' order.receipt.pk %}">{{ order.receipt.ref }}</a> ({{ order.receipt.get_state_display }}){% else %}-{% endif %}</p>
+  </div>
+  {% if order.notes %}<p class="note">{{ order.notes }}</p>{% endif %}
+  <table class="list"><thead><tr><th>Product</th><th>Quantity</th><th>Unit cost</th><th>Subtotal</th></tr></thead><tbody>
+  {% for ln in order.lines.all %}<tr><td>{{ ln.product }}</td><td>{{ ln.qty }}</td><td>{{ ln.unit_cost }}</td><td>{{ ln.subtotal|floatformat:2 }}</td></tr>{% endfor %}
+  <tr><td colspan="3"><b>Total (ZMW)</b></td><td><b>{{ order.total|floatformat:2 }}</b></td></tr></tbody></table>
+</div>
+{% endif %}
+{% endblock %}

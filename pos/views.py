@@ -13,10 +13,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from inventory import audit
 from inventory.models import Partner, Product, Warehouse, ZraConfig
 
-from . import services
-from .models import PosOrder, PosPayment, PosSession
+from . import receivables, services
+from .models import CustomerPayment, PosOrder, PosPayment, PosSession
 from .services import PosError
 
 
@@ -135,6 +136,10 @@ def session_close(request, pk=None):
         except (PosError, InvalidOperation) as e:
             messages.error(request, str(e) or "Counted cash is not a number.")
         else:
+            diff = session.difference
+            audit.log(request, "session closed", session,
+                      f"expected {session.expected_cash}, counted {session.counted_cash}"
+                      + (f", DIFFERENCE {diff}" if diff else ""))
             messages.success(request, "Session closed.")
             return redirect("pos:session_close", pk=session.pk)
     return render(request, "pos/session_close.html", _ctx(request, "Cash up", s=session, summary=summary,
@@ -181,6 +186,7 @@ def refund(request, pk):
     except PosError as e:
         messages.error(request, str(e))
         return redirect("pos:order_detail", pk=pk)
+    audit.log(request, "sale refunded", order.number, f"as {r.number}, K{order.total}; {request.POST.get('reason', '')}")
     messages.success(request, f"Refunded as {r.number}.")
     return redirect("pos:order_detail", pk=r.pk)
 
@@ -211,3 +217,39 @@ def report(request):
         methods=[{"label": labels.get(m["method"], m["method"]),
                   "t": m["t"] - (change if m["method"] == PosPayment.CASH else 0)} for m in methods],
         grand=orders.aggregate(t=Sum("total"), tax=Sum("tax_total"), n=Count("id"))))
+
+
+# ------------------------------------------------------------------ customers on account
+@manager_required
+def customers(request):
+    rows = receivables.summary()
+    return render(request, "pos/customers.html", _ctx(
+        request, "Customers on account", rows=rows, total=sum((r["balance"] for r in rows), Decimal("0")),
+        overdue=sum((r["overdue"] for r in rows), Decimal("0"))))
+
+
+@manager_required
+def customer_statement(request, pk):
+    customer = get_object_or_404(Partner, pk=pk, is_customer=True)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "payment":
+                pay = receivables.record_payment(
+                    customer, Decimal(request.POST.get("amount") or 0), request.POST.get("method") or "cash",
+                    request.user, reference=request.POST.get("reference", ""), note=request.POST.get("note", ""))
+                audit.log(request, "payment received", f"{customer.name}", f"K{pay.amount} by {pay.get_method_display()}")
+                messages.success(request, f"Recorded {pay.amount:.2f} from {customer.name}.")
+            elif action == "limit":
+                old = customer.credit_limit
+                customer.credit_limit = Decimal(request.POST.get("credit_limit") or 0)
+                customer.save(update_fields=["credit_limit"])
+                audit.log(request, "credit limit changed", customer.name, f"{old} to {customer.credit_limit}")
+                messages.success(request, "Credit limit saved.")
+        except (PosError, InvalidOperation) as e:
+            messages.error(request, str(e) or "That amount is not a number.")
+        return redirect("pos:customer_statement", pk=pk)
+    rows = receivables.statement(customer)
+    return render(request, "pos/customer_statement.html", _ctx(
+        request, f"Statement: {customer.name}", customer=customer, rows=rows, balance=receivables.balance(customer),
+        aging=receivables.aging(customer), methods=CustomerPayment.METHODS, today=timezone.now()))

@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory, modelform_factory
 
 from .models import (SyncPeer, ApiToken, LandedCost, Location, Partner, Picking, PickingLine, Product, ProductCategory,
-                     Scrap, UoM, UoMCategory, Warehouse, ZraConfig)
+                     PurchaseOrder, PurchaseOrderLine, Scrap, UoM, UoMCategory, Warehouse, ZraConfig)
 
 
 class ProductForm(forms.ModelForm):
@@ -81,5 +81,60 @@ CRUD = {
     "uom-categories": (UoMCategory, ["name"], "UoM categories"),
     "uoms": (UoM, ["name", "category", "ratio", "zra_qty_code", "zra_pkg_code"], "Units of measure"),
     "sync-peers": (SyncPeer, ["name", "url", "token", "active", "pull_products"], "Sync peers"),
-    "partners": (Partner, ["name", "is_supplier", "is_customer", "phone", "email", "tpin"], "Contacts"),
+    "partners": (Partner, ["name", "is_supplier", "is_customer", "phone", "email", "tpin", "credit_limit"], "Contacts"),
 }
+
+
+ROLES = [("manager", "Manager (everything)"), ("warehouse", "Warehouse Manager"), ("storekeeper", "Storekeeper"),
+         ("cashier", "Cashier"), ("viewer", "View only")]
+ROLE_GROUPS = {"warehouse": "Warehouse Manager", "storekeeper": "Storekeeper", "cashier": "Cashier"}
+
+
+class UserForm(forms.Form):
+    username = forms.CharField(max_length=150)
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    role = forms.ChoiceField(choices=ROLES)
+    active = forms.BooleanField(required=False, initial=True)
+    password = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False),
+                               help_text="Leave empty to keep the current password.")
+
+    def __init__(self, *a, user=None, **kw):
+        super().__init__(*a, **kw)
+        self.user = user
+        if user:
+            self.fields["username"].disabled = True
+        else:
+            self.fields["password"].required = True
+            self.fields["password"].help_text = "At least 8 characters; not a common password."
+
+    def clean_username(self):
+        name = self.cleaned_data["username"].strip()
+        from django.contrib.auth import get_user_model
+        if not self.user and get_user_model().objects.filter(username__iexact=name).exists():
+            raise forms.ValidationError("That username is taken.")
+        return name
+
+    def clean_password(self):
+        pw = self.cleaned_data["password"]
+        if pw:
+            from django.contrib.auth.password_validation import validate_password
+            validate_password(pw, self.user)
+        return pw
+
+
+class PurchaseOrderForm(forms.ModelForm):
+    class Meta:
+        model = PurchaseOrder
+        fields = ["supplier", "order_date", "expected_date", "notes"]
+        widgets = {"order_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+                   "expected_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+                   "notes": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.fields["supplier"].queryset = Partner.objects.filter(is_supplier=True).order_by("name")
+
+
+POLineFormSet = inlineformset_factory(PurchaseOrder, PurchaseOrderLine, fields=["product", "qty", "unit_cost"],
+                                      extra=3, can_delete=True)

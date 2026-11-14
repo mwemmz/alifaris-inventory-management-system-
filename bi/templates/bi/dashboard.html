@@ -11,6 +11,7 @@
  <div class="card"><div class="big">{{ stock_value|floatformat:0 }}</div>Stock value (cost)<br><span class="delta"><a href="{% url 'bi:stock' %}">Stock analysis</a></span></div>
 </div>
 <div class="tiles">
+ <a class="card alert {% if owed %}bad{% else %}ok{% endif %}" href="{% url 'pos:customers' %}"><b>{{ owed|floatformat:0 }}</b> owed by customers</a>
  <a class="card alert {% if reorder %}bad{% else %}ok{% endif %}" href="{% url 'bi:insights' %}"><b>{{ reorder }}</b> product(s) to reorder</a>
  {% if zra_on %}<a class="card alert {% if zra_failed %}bad{% elif zra_pending %}{% else %}ok{% endif %}" href="{% url 'pos:report' %}"><b>{{ zra_pending }}</b> sales waiting for ZRA{% if zra_failed %}, <b>{{ zra_failed }}</b> failed{% endif %}</a>{% else %}<div class="card alert">ZRA sending is switched off</div>{% endif %}
  {% for p in peers %}<div class="card alert {% if 'OK' in p.last_result %}ok{% else %}bad{% endif %}"><b>{{ p.name }}</b> sync<br><small>{% if p.last_run %}{{ p.last_run|timesince }} ago{% else %}never run{% endif %} · {{ p.last_result|truncatechars:60 }}</small></div>{% endfor %}

@@ -20,6 +20,7 @@
       <a href="{% url 'inventory:scrap' %}">Scrap</a>
       <a href="{% url 'inventory:landed' %}">Landed Costs</a>
       <h6>Procurement</h6>
+      {% if can_manage_stock %}<a href="{% url 'inventory:po_list' %}">Purchase Orders</a>{% endif %}
       <a href="{% url 'inventory:replenishment' %}">Replenishment</a>
     </div></div>
     <a href="{% url 'inventory:products' %}">Products</a>
@@ -47,7 +48,12 @@
       <a href="{% url 'inventory:zra_settings' %}">ZRA Smart Invoice</a>
       <a href="{% url 'inventory:tokens' %}">POS API tokens</a>
       <a href="{% url 'inventory:sync' %}">Site sync</a>
+      <h6>People</h6>
+      <a href="{% url 'inventory:users' %}">Users and roles</a>
+      <a href="{% url 'inventory:audit' %}">Audit log</a>
       {% endif %}
+      <h6>Data</h6>
+      <a href="{% url 'inventory:data' %}">Backup and exports</a>
     </div></div>
     <a href="{% url 'inventory:import' %}">Import Products</a>
     {% endif %}

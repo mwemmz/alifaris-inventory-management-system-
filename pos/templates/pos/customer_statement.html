@@ -1,0 +1,24 @@
+{% extends "pos/base.html" %}
+{% block page %}
+<h2>Statement: {{ customer.name }} <small>{{ today|date:"d M Y" }}</small></h2>
+<p>{% if customer.tpin %}TPIN {{ customer.tpin }} · {% endif %}{% if customer.phone %}{{ customer.phone }} · {% endif %}<a href="{% url 'pos:customers' %}">All customers</a> · <a href="#" onclick="window.print();return false">Print statement</a></p>
+<div class="cards"><div class="card"><b>{{ balance|floatformat:2 }}</b><br>owed now</div>
+{% for a in aging %}<div class="card"><b>{{ a.amount|floatformat:2 }}</b><br>{{ a.label }}</div>{% endfor %}</div>
+<table class="t"><tr><th>Date</th><th>What</th><th>Reference</th><th class="r">Charged</th><th class="r">Paid or credited</th><th class="r">Balance</th></tr>
+{% for r in rows %}<tr><td>{{ r.date|date:"d M Y H:i" }}</td><td>{{ r.kind }}</td><td>{% if r.order %}<a href="{% url 'pos:order_detail' r.order.pk %}">{{ r.ref }}</a>{% else %}{{ r.ref }}{% endif %}</td>
+<td class="r">{% if r.charge %}{{ r.charge|floatformat:2 }}{% endif %}</td><td class="r">{% if r.credit %}{{ r.credit|floatformat:2 }}{% endif %}</td><td class="r">{{ r.balance|floatformat:2 }}</td></tr>
+{% empty %}<tr><td colspan="6">No activity yet.</td></tr>{% endfor %}</table>
+<div class="cols noprint">
+<div><h3>Record a payment</h3>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="payment">
+<label>Amount<input name="amount" inputmode="decimal" required></label>
+<label>Paid by<select name="method">{% for v, l in methods %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+<label>Reference<input name="reference" placeholder="Receipt or transfer number"></label>
+<label>Note<input name="note"></label>
+<button class="btn primary">Save payment</button></form></div>
+<div><h3>Credit limit</h3>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="limit">
+<label>Most they may owe (0 = no limit)<input name="credit_limit" inputmode="decimal" value="{{ customer.credit_limit }}"></label>
+<button class="btn">Save limit</button></form></div></div>
+<style>@media print{.posbar,.msgs,.noprint,.pager{display:none!important}}</style>
+{% endblock %}

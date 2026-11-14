@@ -9,8 +9,8 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from . import forms as f
-from .models import (SyncPeer, ApiToken, LandedCost, Location, OperationType, Picking, Product, Scrap, StockMove, StockQuant,
+from . import audit, forms as f
+from .models import (SyncPeer, ApiToken, LandedCost, Location, OperationType, Partner, Picking, Product, PurchaseOrder, Scrap, StockMove, StockQuant,
                      ZraConfig, ZraLog)
 from .services import importer, stock, sync as sync_service, zra
 from .permissions import (WM_CONFIG_KEYS, can_edit, can_manage_stock, editor_required, is_warehouse_manager,
@@ -32,12 +32,13 @@ def ctx(request, **extra):
     return base
 
 
-def table(request, title, headers, rows, *, new_url=None, new_label="New", back=None, note=None, actions=None):
+def table(request, title, headers, rows, *, new_url=None, new_label="New", back=None, note=None, actions=None,
+          po_suppliers=None):
     """Generic list page. rows = list of (cells, url_or_None)."""
     page = Paginator(rows, 80).get_page(request.GET.get("page"))
     return render(request, "inventory/table.html", ctx(request, title=title, headers=headers, page=page,
                                                         new_url=new_url, new_label=new_label, note=note,
-                                                        actions=actions or []))
+                                                        actions=actions or [], po_suppliers=po_suppliers))
 
 
 # ---------------------------------------------------------------- overview
@@ -136,6 +137,10 @@ def picking_action(request, pk, action):
     try:
         if action == "validate":
             stock.validate_picking(picking)
+            for po in PurchaseOrder.objects.filter(receipt=picking):
+                if po.sync() == PurchaseOrder.RECEIVED:
+                    audit.log(request, "purchase order received", po.ref, picking.ref)
+            audit.log(request, "stock validated", picking.ref, f"{picking.op_type.name}, {picking.lines.count()} line(s)")
             messages.success(request, f"{picking.ref} validated. Stock updated.")
             cfg = ZraConfig.get()
             if cfg.enabled and cfg.push_stock_after_validate:
@@ -143,6 +148,7 @@ def picking_action(request, pk, action):
                     zra.push_stock_level(ln.product, request.user.get_username())
         elif action == "cancel":
             stock.cancel_picking(picking)
+            audit.log(request, "document cancelled", picking.ref)
             messages.success(request, f"{picking.ref} cancelled.")
     except StockError as e:
         messages.error(request, str(e))
@@ -176,6 +182,7 @@ def physical_inventory(request):
             counts[p.pk] = Decimal(extra)
         try:
             n = stock.apply_count(loc, counts)
+            audit.log(request, "stock count applied", loc, f"{n} product(s) adjusted")
             messages.success(request, f"Applied counts: {n} product(s) adjusted.")
         except StockError as e:
             messages.error(request, str(e))
@@ -252,7 +259,8 @@ def replenishment(request):
             for r in rows_data]
     return table(request, "Replenishment", ["Product", "On hand", "Minimum", "Maximum", "To order"], rows,
                  note="Products below their reorder minimum. Set minimum and maximum on each product.",
-                 actions=[{"label": "Create draft receipt", "post": True}] if rows else [])
+                 actions=[{"label": "Create draft receipt", "post": True}] if rows else [],
+                 po_suppliers=Partner.objects.filter(is_supplier=True).order_by("name") if rows and can_manage_stock(request.user) else None)
 
 
 # ---------------------------------------------------------------- products
@@ -287,7 +295,12 @@ def product_edit(request, pk=None):
     product = get_object_or_404(Product, pk=pk) if pk else None
     form = f.ProductForm(request.POST or None, request.FILES or None, instance=product)
     if form.is_valid():
+        changed = [f"{k}: {form.initial.get(k)} to {form.cleaned_data.get(k)}" for k in
+                   ("name", "price", "secondary_price", "cost", "min_qty", "max_qty", "tax_type", "active")
+                   if product and k in form.changed_data]
         saved = form.save()
+        audit.log(request, "product changed" if product else "product created", saved,
+                  "; ".join(changed))
         messages.success(request, f"Saved {saved.name}")
         return redirect("inventory:product_edit", pk=saved.pk)
     ctx_extra = {"product": product, "on_hand": product.on_hand if product else None}
@@ -382,7 +395,8 @@ def crud_edit(request, key, pk=None):
     obj = get_object_or_404(model, pk=pk) if pk else None
     form = f.crud_form(model, fields)(request.POST or None, instance=obj)
     if form.is_valid():
-        form.save()
+        saved = form.save()
+        audit.log(request, f"{title.lower()} saved", saved, ", ".join(form.changed_data) if obj else "created")
         messages.success(request, "Saved")
         return redirect("inventory:crud_list", key=key)
     return render(request, "inventory/form.html", ctx(request, title=title, form=form, back=f"/inventory/config/{key}/"))
@@ -394,6 +408,7 @@ def zra_settings(request):
     form = f.ZraConfigForm(request.POST or None, instance=cfg)
     if form.is_valid():
         form.save()
+        audit.log(request, "ZRA settings changed", "ZRA Smart Invoice", ", ".join(form.changed_data))
         messages.success(request, "ZRA settings saved")
         return redirect("inventory:zra_settings")
     pending = Product.objects.filter(active=True, zra_registered=False).count()
@@ -408,10 +423,101 @@ def tokens(request):
     if request.method == "POST":
         if "revoke" in request.POST:
             ApiToken.objects.filter(pk=request.POST["revoke"]).update(active=False)
+            audit.log(request, "API token revoked", request.POST["revoke"])
         elif form.is_valid():
-            form.save()
+            tok = form.save()
+            audit.log(request, "API token created", getattr(tok, "name", ""))
         return redirect("inventory:tokens")
     return render(request, "inventory/tokens.html", ctx(request, tokens=ApiToken.objects.all(), form=f.TokenForm()))
+
+
+# ---------------------------------------------------------------- people and audit trail
+ROLE_LABELS = dict(f.ROLES)
+
+
+def role_of(user):
+    if user.is_staff or user.is_superuser:
+        return "manager"
+    names = set(user.groups.values_list("name", flat=True))
+    for role, group in f.ROLE_GROUPS.items():
+        if group in names:
+            return role
+    return "viewer"
+
+
+def _managers_left(excluding=None):
+    from django.contrib.auth import get_user_model
+    qs = get_user_model().objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_superuser=True))
+    return qs.exclude(pk=excluding.pk).count() if excluding else qs.count()
+
+
+@staff_required
+def users(request):
+    from django.contrib.auth import get_user_model
+    rows = []
+    for u in get_user_model().objects.order_by("-is_active", "username"):
+        rows.append(([u.username, u.get_full_name(), ROLE_LABELS[role_of(u)], "Active" if u.is_active else "Switched off",
+                      u.last_login.strftime("%d %b %Y %H:%M") if u.last_login else "never"], f"/inventory/users/{u.pk}/"))
+    return table(request, "Users", ["Username", "Name", "Role", "Status", "Last login"], rows,
+                 new_url="/inventory/users/new/", new_label="New user",
+                 note="Managers see everything. Warehouse managers run stock. Cashiers sell. View only can look but not change.")
+
+
+@staff_required
+def user_edit(request, pk=None):
+    from django.contrib.auth import get_user_model
+    U = get_user_model()
+    user = get_object_or_404(U, pk=pk) if pk else None
+    if user and user.is_superuser and user != request.user:
+        messages.error(request, "Superuser accounts are changed in the admin site.")
+        return redirect("inventory:users")
+    initial = {"username": user.username, "first_name": user.first_name, "last_name": user.last_name,
+               "role": role_of(user), "active": user.is_active} if user else {}
+    form = f.UserForm(request.POST or None, initial=initial, user=user)
+    if form.is_valid():
+        d = form.cleaned_data
+        role = d["role"]
+        if user and user == request.user and (role != "manager" or not d["active"]):
+            messages.error(request, "You cannot remove your own manager access or switch yourself off.")
+            return redirect("inventory:user_edit", pk=user.pk)
+        if user and (role != "manager" or not d["active"]) and role_of(user) == "manager" and _managers_left(user) == 0:
+            messages.error(request, "That would leave no manager. Make someone else a manager first.")
+            return redirect("inventory:user_edit", pk=user.pk)
+        creating = user is None
+        before = None if creating else f"{ROLE_LABELS[role_of(user)]}, {'active' if user.is_active else 'off'}"
+        if creating:
+            user = U(username=d["username"])
+        user.first_name, user.last_name = d["first_name"], d["last_name"]
+        user.is_staff = role == "manager"
+        user.is_active = d["active"]
+        if d["password"]:
+            user.set_password(d["password"])
+        user.save()
+        from django.contrib.auth.models import Group
+        user.groups.remove(*Group.objects.filter(name__in=f.ROLE_GROUPS.values()))
+        if role in f.ROLE_GROUPS:
+            user.groups.add(Group.objects.get_or_create(name=f.ROLE_GROUPS[role])[0])
+        after = f"{ROLE_LABELS[role]}, {'active' if user.is_active else 'off'}"
+        audit.log(request, "user created" if creating else "user changed", user.username,
+                  after if creating else f"{before} to {after}" + ("; password reset" if d["password"] else ""))
+        messages.success(request, f"Saved {user.username}.")
+        return redirect("inventory:users")
+    return render(request, "inventory/form.html", ctx(request, title=f"User: {user.username}" if user else "New user",
+                                                      form=form, back="/inventory/users/"))
+
+
+@staff_required
+def audit_log(request):
+    from .models import AuditLog
+    qs = AuditLog.objects.all()
+    if u := request.GET.get("user"):
+        qs = qs.filter(username__icontains=u)
+    if a := request.GET.get("action"):
+        qs = qs.filter(action__icontains=a)
+    if q := request.GET.get("q"):
+        qs = qs.filter(Q(subject__icontains=q) | Q(detail__icontains=q))
+    page = Paginator(qs, 100).get_page(request.GET.get("page"))
+    return render(request, "inventory/audit.html", ctx(request, page=page, g=request.GET))
 
 
 # ---------------------------------------------------------------- import
@@ -427,6 +533,7 @@ def import_products(request):
             rows = None
         if rows is not None:
             result = importer.import_rows(rows, form.cleaned_data["mode"], form.cleaned_data["skip_errors"])
+            audit.log(request, "products imported", request.FILES["file"].name, form.cleaned_data["mode"])
             loc = Location.objects.filter(usage=Location.INTERNAL).first()
             for product, qty in result["opening"]:
                 if product.tracks_stock and loc:
@@ -499,3 +606,147 @@ def sync_peers(request):
         (messages.success if ok else messages.error)(request, f"{peer.name}: {msg}")
         return redirect("inventory:sync")
     return render(request, "inventory/sync.html", ctx(request, peers=SyncPeer.objects.all()))
+
+
+# ---------------------------------------------------------------- purchase orders
+@stock_manager_required
+def po_list(request):
+    qs = PurchaseOrder.objects.select_related("supplier", "receipt").prefetch_related("lines")
+    for po in qs.filter(state=PurchaseOrder.CONFIRMED):
+        po.sync()
+    if s := request.GET.get("state"):
+        qs = qs.filter(state=s)
+    if q := request.GET.get("q"):
+        qs = qs.filter(Q(ref__icontains=q) | Q(supplier__name__icontains=q))
+    rows = [([o.ref, o.supplier.name, o.order_date.isoformat(), o.expected_date.isoformat() if o.expected_date else "",
+              f"{o.total:,.2f}", o.get_state_display()], f"/inventory/purchase/{o.pk}/") for o in qs]
+    return table(request, "Purchase Orders", ["Reference", "Supplier", "Ordered", "Expected", "Total (ZMW)", "Status"], rows,
+                 new_url="/inventory/purchase/new/", note="Filter: ?state=draft, ?state=confirmed, ?state=received or ?q=text. "
+                 "To start from what is low on stock, use Replenishment, then Create purchase orders.")
+
+
+@stock_manager_required
+def po_edit(request, pk=None):
+    order = get_object_or_404(PurchaseOrder, pk=pk) if pk else PurchaseOrder(created_by=request.user)
+    if pk:
+        order.sync()
+    editable = order.state == PurchaseOrder.DRAFT
+    if request.method == "POST" and editable:
+        form = f.PurchaseOrderForm(request.POST, instance=order)
+        lines = f.POLineFormSet(request.POST, instance=order)
+        if form.is_valid() and lines.is_valid():
+            creating = order.pk is None
+            saved = form.save()
+            lines.instance = saved
+            lines.save()
+            audit.log(request, "purchase order created" if creating else "purchase order changed", saved.ref,
+                      f"{saved.supplier}, {saved.lines.count()} line(s), ZMW {saved.total:,.2f}")
+            messages.success(request, f"Saved {saved.ref}")
+            return redirect("inventory:po_edit", pk=saved.pk)
+    else:
+        form = f.PurchaseOrderForm(instance=order)
+        lines = f.POLineFormSet(instance=order)
+    return render(request, "inventory/po_form.html", ctx(request, order=order, form=form, lines=lines, editable=editable,
+                                                         title="Purchase Orders", new=pk is None))
+
+
+@stock_manager_required
+@require_POST
+def po_action(request, pk, action):
+    order = get_object_or_404(PurchaseOrder, pk=pk)
+    if action == "confirm" and order.state == PurchaseOrder.DRAFT:
+        if not order.lines.exists():
+            messages.error(request, "Add at least one product before ordering.")
+        else:
+            order.state = PurchaseOrder.CONFIRMED
+            order.save(update_fields=["state"])
+            audit.log(request, "purchase order placed", order.ref, f"{order.supplier}, ZMW {order.total:,.2f}")
+            messages.success(request, f"{order.ref} marked as ordered.")
+    elif action == "receive" and order.state == PurchaseOrder.CONFIRMED:
+        if order.receipt_id is None:
+            op = OperationType.objects.filter(code=OperationType.RECEIPT).first()
+            if not op:
+                messages.error(request, "Run: python manage.py seed_inventory")
+                return redirect("inventory:po_edit", pk=pk)
+            order.receipt = stock.new_picking(op, [(ln.product, ln.qty, ln.unit_cost) for ln in order.lines.all()],
+                                              partner=order.supplier, origin=order.ref, user=request.user,
+                                              notes=f"Goods for {order.ref}")
+            order.save(update_fields=["receipt"])
+            audit.log(request, "purchase order receiving", order.ref, order.receipt.ref)
+        return redirect("inventory:picking_detail", pk=order.receipt_id)
+    elif action == "cancel" and order.state in (PurchaseOrder.DRAFT, PurchaseOrder.CONFIRMED):
+        if order.receipt_id and order.receipt.state == Picking.DRAFT:
+            stock.cancel_picking(order.receipt)
+        order.state = PurchaseOrder.CANCEL
+        order.save(update_fields=["state"])
+        audit.log(request, "purchase order cancelled", order.ref)
+        messages.success(request, f"{order.ref} cancelled.")
+    return redirect("inventory:po_edit", pk=pk)
+
+
+@stock_manager_required
+@require_POST
+def po_from_replenishment(request):
+    """One draft order per preferred supplier-less group: we have no supplier on products, so use the chosen supplier."""
+    from .models import Partner, PurchaseOrderLine
+    supplier = Partner.objects.filter(pk=request.POST.get("supplier"), is_supplier=True).first()
+    if not supplier:
+        messages.error(request, "Choose a supplier first (add one under Configuration, Contacts, tick Supplier).")
+        return redirect("inventory:replenishment")
+    items = stock.replenishment_candidates()
+    if not items:
+        messages.info(request, "Nothing is below its reorder minimum.")
+        return redirect("inventory:replenishment")
+    order = PurchaseOrder.objects.create(supplier=supplier, created_by=request.user, notes="Created from replenishment")
+    for r in items:
+        PurchaseOrderLine.objects.create(order=order, product=r["product"], qty=r["to_order"], unit_cost=r["product"].cost)
+    audit.log(request, "purchase order created", order.ref, f"{supplier}, from replenishment, {len(items)} line(s)")
+    messages.success(request, f"{order.ref} drafted with {len(items)} product(s). Check quantities and prices, then mark it ordered.")
+    return redirect("inventory:po_edit", pk=order.pk)
+
+
+# ---------------------------------------------------------------- backup and exports
+@staff_required
+def backup_download(request):
+    """Manager-only: download a consistent copy of the whole database."""
+    from django.http import FileResponse
+    from .services.backup import make_backup
+    path = make_backup()
+    audit.log(request, "database backup downloaded", path.name)
+    resp = FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
+    path.unlink(missing_ok=True)  # the open handle keeps the data readable on Linux
+    return resp
+
+
+@login_required
+def export_xlsx(request, kind):
+    from datetime import date
+    from .services import exports
+    # money and sales detail are for managers; a storekeeper may take the product and stock lists
+    allowed = {"products", "valuation", "moves", "purchases"} if can_manage_stock(request.user) else set()
+    if request.user.is_staff:
+        allowed = set(exports.BUILDERS)
+    if kind not in exports.BUILDERS or kind not in allowed:
+        raise Http404
+    args = []
+    if kind == "sales":
+        for key in ("from", "to"):
+            try:
+                args.append(date.fromisoformat(request.GET.get(key, "")))
+            except ValueError:
+                args.append(None)
+    title, header, rows = exports.BUILDERS[kind](*args)
+    audit.log(request, "export downloaded", title, f"{len(rows)} row(s)")
+    resp = HttpResponse(exports.to_xlsx(title, header, rows),
+                        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    resp["Content-Disposition"] = f'attachment; filename="alifaris-{kind}-{date.today():%Y%m%d}.xlsx"'
+    return resp
+
+
+@stock_manager_required
+def data_page(request):
+    from .services import exports
+    return render(request, "inventory/data.html", ctx(request, title="Backup and exports", kinds=[
+        ("products", "Products and prices"), ("valuation", "Stock valuation"), ("moves", "Stock movements"),
+        ("purchases", "Purchase orders"), ("sales", "Sales with profit"), ("receivables", "Customers who owe")],
+        is_manager=request.user.is_staff))

@@ -76,6 +76,21 @@ Stock quantities are never copied directly; they are always rebuilt from moves.
 - **Storekeeper group** (created by `seed_inventory`): record receipts, deliveries, transfers, counts, scrap and edit products.
 - **Any other logged-in user**: view only.
 
+## Credit sales and customer statements (`/pos/customers/`)
+
+A sale can be paid on account ("On account" payment method). The customer must be chosen, and a manager can set a **credit limit** on the contact (0 means no limit); a sale that would go over it is refused. Money received later is recorded on the customer's page ("Receive payment"). The page shows a statement (every sale on account and every payment, with running balance) and ageing (0-30, 31-60, 61-90, over 90 days, oldest first). The manager dashboard shows the total owed.
+
+## Profit
+
+Each sale line keeps the product's average cost at the moment of sale, so margin is exact and does not change when costs change later. Refunds reverse both revenue and cost. The Sales report and the Excel "Sales with profit" export use it.
+
+## Users, audit log, purchasing, backups
+
+- **Users and roles** (Configuration, managers only): create users, set Manager / Warehouse Manager / Storekeeper / Cashier / View only, deactivate, reset passwords. The last active manager cannot be demoted or deactivated.
+- **Audit log** (managers only): who changed prices, products, users, settings, validated stock, cancelled documents, refunded or took payments, downloaded backups or exports, plus failed logins, with time and IP.
+- **Purchase orders** (Operations, Procurement): draft, mark as ordered, **Receive goods** (creates the draft receipt for the supplier; validating that receipt adds the stock, updates average cost and closes the order). Replenishment can draft an order for everything below its minimum. Suppliers are contacts with Supplier ticked.
+- **Backup and exports** (Configuration, Data): managers download a consistent copy of the database and Excel files for products, valuation, movements, purchase orders, sales with profit and customers who owe. For automatic backups schedule `python manage.py backup_db --to backups --keep 14`. Keep copies off the machine; restoring means replacing the database file.
+
 ## Deploying
 
     pip install -r requirements.txt
