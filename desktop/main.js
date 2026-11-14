@@ -11,7 +11,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
-let cfg = { url: 'http://127.0.0.1:8000', start_server: false, python: 'python', project_dir: '', mode: 'erp', silent_print: false };
+let cfg = { host: '', url: 'http://127.0.0.1:8000', start_server: false, python: 'python', project_dir: '', mode: 'erp', silent_print: false };
 try { cfg = { ...cfg, ...JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8')) }; } catch (e) { /* defaults */ }
 if (process.env.ALIFARIS_URL) cfg.url = process.env.ALIFARIS_URL;
 if (process.env.ALIFARIS_MODE) cfg.mode = process.env.ALIFARIS_MODE;
@@ -29,7 +29,41 @@ function waitFor(url, tries = 60) {
   });
 }
 
+// Installed copy: the installer carries its own server program (resources/server), so nothing else is needed on the PC.
+const bundled = app.isPackaged
+  ? path.join(process.resourcesPath, 'server', process.platform === 'win32' ? 'alifaris-server.exe' : 'alifaris-server')
+  : null;
+if (bundled) {
+  // Installed defaults: run the bundled server on this PC. A till that should use another PC's server puts
+  // {"url": "http://shop-pc:8765", "start_server": false} in %APPDATA%/AlifarisERP/desktop.json.
+  cfg.url = 'http://127.0.0.1:8765';
+  cfg.start_server = true;
+  try {
+    const f = path.join(process.env.APPDATA || path.join(require('os').homedir(), '.config'), 'AlifarisERP', 'desktop.json');
+    cfg = { ...cfg, ...JSON.parse(fs.readFileSync(f, 'utf8')) };
+  } catch (e) { /* no override */ }
+  if (process.env.ALIFARIS_URL) cfg.url = process.env.ALIFARIS_URL;
+}
+
+function startBundled() {
+  const port = new URL(cfg.url).port || '8765';
+  server = spawn(bundled, ['--port', port, '--host', cfg.host || '127.0.0.1'], { stdio: 'ignore', windowsHide: true });
+  server.on('exit', () => { server = null; });
+}
+
+function showFirstLogin() {
+  // The server writes the first manager login into its data folder once; show it, then remove the file.
+  const f = path.join(process.env.APPDATA || path.join(require('os').homedir(), '.config'), 'AlifarisERP', 'first-login.txt');
+  try {
+    const text = fs.readFileSync(f, 'utf8');
+    dialog.showMessageBoxSync({ type: 'info', title: 'Alifaris ERP: your first login',
+                                message: 'Write these down. They are shown only once.', detail: text });
+    fs.unlinkSync(f);
+  } catch (e) { /* not the first run */ }
+}
+
 function startServer() {
+  if (bundled) return startBundled();
   const port = new URL(cfg.url).port || '8000';
   spawnSync(cfg.python, ['manage.py', 'migrate', '--noinput'], { cwd: cfg.project_dir, stdio: 'ignore', windowsHide: true });
   server = spawn(cfg.python, ['manage.py', 'runserver', `127.0.0.1:${port}`, '--noreload'],
@@ -53,7 +87,8 @@ async function createWindow() {
   });
   try {
     if (cfg.start_server) startServer();
-    await waitFor(cfg.url);
+    await waitFor(cfg.url, 120);
+    if (bundled) showFirstLogin();
     await win.loadURL(cfg.url.replace(/\/$/, '') + (isPos ? '/pos/' : '/'));
   } catch (e) {
     dialog.showErrorBox('Alifaris ERP', `Could not reach ${cfg.url}.\nCheck that the server is running and the address in config.json is right.`);

@@ -34,7 +34,8 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_O
 if os.environ.get("RENDER_EXTERNAL_URL"):
     CSRF_TRUSTED_ORIGINS.append(os.environ["RENDER_EXTERNAL_URL"])
 
-if not DEBUG:
+if not DEBUG and os.environ.get("ALIFARIS_LOCAL") != "1":
+    # (ALIFARIS_LOCAL=1: the desktop install talks to itself over plain http on 127.0.0.1)
     # Behind a TLS-terminating proxy (Render, nginx): trust its header and keep cookies on HTTPS only.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True

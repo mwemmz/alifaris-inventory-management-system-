@@ -1,0 +1,35 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Bundle the server (no Python needed on the client PC)
+        shell: bash
+        run: |
+          pip install -r requirements-desktop.txt
+          python manage.py collectstatic --noinput
+          W="$(pwd -W)"
+          pyinstaller --noconfirm --onedir --name alifaris-server --distpath dist-server --workpath build-server --specpath build-server \
+            --paths . --exclude-module pkg_resources --exclude-module setuptools \
+            --collect-submodules config --collect-submodules inventory --collect-submodules pos --collect-submodules bi --collect-submodules launcher \
+            --collect-submodules django --collect-all whitenoise --collect-all openpyxl --hidden-import waitress \
+            --add-data "$W/inventory;inventory" --add-data "$W/pos;pos" --add-data "$W/bi;bi" --add-data "$W/launcher;launcher" \
+            --add-data "$W/config;config" --add-data "$W/staticfiles;staticfiles" desktop_server.py
+      - name: Build the installer
+        working-directory: desktop
+        run: |
+          npm install
+          npx electron-builder --win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Alifaris-ERP-Setup
+          path: desktop/dist/*.exe

@@ -1,7 +1,24 @@
 # Desktop app
 
-A thin Electron window around the same Django app. It was written but **not built or run** in the environment this was
-created in, so treat the first build as a test.
+## The installer (what you give a client)
+
+A GitHub build makes a normal Windows installer, `Alifaris ERP Setup.exe`. It carries its own server, so the client PC
+needs no Python, no Node and no command prompt: double-click, next, and the app opens from the desktop icon.
+
+1. On GitHub open the repo, Actions, "Windows installer", Run workflow. After about 10 minutes download `Alifaris-ERP-Setup`.
+2. Run the .exe on the laptop. On the first start it shows an admin login once. Write it down, sign in, then change it
+   under Configuration, Users and roles.
+3. Data lives in `%APPDATA%\AlifarisERP` (database, secret key, `backups/` with a fresh copy every start, last 14 kept).
+   Uninstalling does not delete it. Back that folder up or use Configuration, Data, Download backup.
+4. Extra tills: install the same app and create `%APPDATA%\AlifarisERP\desktop.json` containing
+   `{"url": "http://SHOP-PC:8765", "start_server": false}`. On the shop PC use `{"host": "0.0.0.0"}` and allow the Windows firewall prompt.
+
+The installer is not code-signed, so Windows SmartScreen shows "unknown publisher": choose More info, Run anyway.
+Test the first installer on a spare PC before the client's laptop.
+
+## Developer mode (not for clients)
+
+A thin Electron window around the same Django app.
 
     cd desktop
     npm install

@@ -1,6 +1,6 @@
 {
   "name": "alifaris-desktop",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Desktop shell for Alifaris ERP",
   "main": "main.js",
   "scripts": {
@@ -16,6 +16,31 @@
   "build": {
     "appId": "com.alifaris.erp",
     "productName": "Alifaris ERP",
-    "win": { "target": "nsis" }
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "config.json",
+      "icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist-server/alifaris-server",
+        "to": "server"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    }
   }
 }
