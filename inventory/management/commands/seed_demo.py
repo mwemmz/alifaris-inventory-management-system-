@@ -67,6 +67,15 @@ PRODUCTS = [
     ("ACC-005", "Steering wheel cover", "Accessories", 45, 85, 30, 8, 36, 0),            # slow stock
     ("ENG-006", "Head gasket, Toyota 4Y", "Engine", 330, 540, 0, 4, 10, 1),             # out of stock
 ]
+# Tiles and flooring, sold by the square metre: answers "how many tiles of each type do we have?"
+TILES = [
+    ("TIL-001", "Floor tile 60x60 grey matt", "Tiles", 118, 185, 420, 120, 520, 5),
+    ("TIL-002", "Floor tile 60x60 white gloss", "Tiles", 124, 195, 310, 120, 520, 4),
+    ("TIL-003", "Wall tile 30x60 ivory", "Tiles", 82, 135, 260, 100, 400, 3),
+    ("TIL-004", "Outdoor tile 40x40 anti-slip", "Tiles", 96, 150, 90, 100, 300, 2),    # below minimum
+    ("TIL-005", "Bathroom tile 25x40 blue", "Tiles", 70, 118, 180, 60, 240, 2),
+    ("TIL-006", "Tile adhesive 25 kg bag", "Tiles", 85, 140, 60, 20, 90, 3),
+]
 SUPPLIERS = ["Copperbelt Auto Wholesale (demo)", "Lusaka Parts Importers (demo)", "Southern Africa Filters (demo)"]
 CUSTOMERS = [("Kabwe Haulage (demo)", "1000000001"), ("Mwami Taxi Co-op (demo)", "1000000002"),
              ("Chilanga Garage (demo)", "1000000003"), ("Zambezi Logistics (demo)", "1000000004")]
@@ -81,7 +90,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--force", action="store_true", help="Run even if products already exist")
-        parser.add_argument("--days", type=int, default=30, help="How many days of sales to create")
+        parser.add_argument("--days", type=int, default=45, help="How many days of sales to create")
 
     def handle(self, *args, **opts):
         if Product.objects.exists() and not opts["force"]:
@@ -94,8 +103,11 @@ class Command(BaseCommand):
         call_command("seed_inventory", verbosity=0)
         wh = Warehouse.objects.get(code="SHOP")
         users = self._users(password)
-        cats = {n: ProductCategory.objects.get_or_create(name=n)[0] for n in sorted({p[2] for p in PRODUCTS})}
+        cats = {n: ProductCategory.objects.get_or_create(name=n)[0] for n in sorted({p[2] for p in PRODUCTS + TILES})}
         uom = UoM.objects.get(name="Units")
+        from inventory.models import UoMCategory
+        area_cat, _ = UoMCategory.objects.get_or_create(name="Area")
+        sqm, _ = UoM.objects.get_or_create(name="m2", defaults=dict(category=area_cat, zra_qty_code="U", zra_pkg_code="NT"))
         suppliers = [Partner.objects.get_or_create(name=n, defaults=dict(is_supplier=True, is_customer=False))[0] for n in SUPPLIERS]
         customers = [Partner.objects.get_or_create(name=n, defaults=dict(tpin=t, is_customer=True))[0] for n, t in CUSTOMERS]
         for c, limit in zip(customers, [20000, 12000, 8000]):  # the first few are account customers with a credit limit
@@ -103,8 +115,8 @@ class Command(BaseCommand):
             c.save(update_fields=["credit_limit"])
 
         products = []
-        for ref, name, cat, cost, price, qty, mn, mx, weight in PRODUCTS:
-            p = Product.objects.create(name=name, internal_ref=ref, category=cats[cat], uom=uom, price=Decimal(price),
+        for ref, name, cat, cost, price, qty, mn, mx, weight in PRODUCTS + TILES:
+            p = Product.objects.create(name=name, internal_ref=ref, category=cats[cat], uom=sqm if ref.startswith("TIL") and ref != "TIL-006" else uom, price=Decimal(price),
                                        secondary_price=Decimal(price) * Decimal("0.92"), cost=Decimal(cost),
                                        min_qty=Decimal(mn), max_qty=Decimal(mx), tax_type="A",
                                        barcode=f"600{zlib.crc32(ref.encode()) % 10**9:09d}")
@@ -115,7 +127,7 @@ class Command(BaseCommand):
         opening = start - timedelta(days=1)
         rcp = OperationType.objects.get(warehouse=wh, code=OperationType.RECEIPT)
         for i, sup in enumerate(suppliers):
-            lines = [(p, Decimal(qty) + self._sold_estimate(weight, opts["days"]), p.cost)
+            lines = [(p, Decimal(qty) + self._sold_estimate(weight, opts["days"]) * (11 if p.uom.name == "m2" else 1), p.cost)
                      for j, (p, qty, weight) in enumerate(products) if j % len(suppliers) == i]
             lines = [l for l in lines if l[1] > 0]
             pk = stock.new_picking(rcp, lines, partner=sup, origin=f"Opening stock {i + 1}", user=users["warehouse"])
@@ -130,7 +142,12 @@ class Command(BaseCommand):
         tz = timezone.get_current_timezone()
         for d in range(opts["days"], -1, -1):
             day = timezone.localtime().date() - timedelta(days=d)
-            per_day = rng.randint(7, 14) + (5 if day.weekday() >= 4 else 0)
+            grow = (opts["days"] - d) / max(opts["days"], 1)           # 0 at the start, 1 today: a growing shop
+            per_day = int(rng.randint(6, 10) + 7 * grow) + (5 if day.weekday() >= 4 else 0)
+            if d == 1:
+                per_day = max(7, per_day - 4)                           # a quiet day before today
+            if d == 0:
+                per_day += 8                                            # a busy day today
             cashier = cashiers[d % 2]
             session = pos.open_session(cashier, wh, 500)
             opened = timezone.make_aware(datetime.combine(day, time(8, 0)), tz)
@@ -143,7 +160,7 @@ class Command(BaseCommand):
                     when = timezone.now() - timedelta(minutes=rng.randint(1, 120))
                 lines = []
                 for p in rng.choices([s[0] for s in selling], weights=weights, k=rng.choice([1, 1, 2, 2, 3])):
-                    qty = rng.choice([1, 1, 1, 2, 2, 4])
+                    qty = rng.choice([8, 12, 16, 24, 40]) if p.internal_ref.startswith('TIL-00') and p.internal_ref < 'TIL-006' else rng.choice([1, 1, 1, 2, 2, 4])
                     if all(l["product"] != p.pk for l in lines) and p.on_hand >= qty:  # never sell what is not on the shelf
                         lines.append({"product": p.pk, "qty": qty, "discount": 0})
                 if not lines:
@@ -193,9 +210,10 @@ class Command(BaseCommand):
 
         # Purchasing: one order received into stock, one on its way, one still being prepared
         n_po = self._purchasing(suppliers, products, users)
+        n_xfer = self._warehouse_story(products, suppliers, users, wh, opening)
 
         # A stock count the day before: a few shelves turn out lower than the books, so the demo has low and empty items.
-        loc = Location.objects.filter(usage=Location.INTERNAL, warehouse=wh).first()
+        loc = Location.objects.get(name="Stock", warehouse=wh)
         counts = {Product.objects.get(internal_ref=r).pk: q for r, q in
                   [("ENG-006", 0), ("FIL-003", 4), ("ELE-004", 2), ("BRK-003", 6), ("OIL-001", 18), ("TRN-001", 3)]}
         stock.apply_count(loc, counts, reason="Physical inventory")
@@ -208,8 +226,30 @@ class Command(BaseCommand):
             audit.log(users[user], action, subject, detail)
         self.stdout.write(self.style.SUCCESS(
             f"Demo data ready: {len(products)} products, {n_orders} sales, {n_refunds} refunds, {n_paid} customer payments, "
-            f"{n_po} purchase orders over {opts['days']} days."))
+            f"{n_po} purchase orders, {n_xfer} warehouse transfers over {opts['days']} days."))
         self.stdout.write("Demo logins (password is ALIFARIS_DEMO_PASSWORD): " + ", ".join(f"{u} ({r})" for u, r in USERS))
+
+    @staticmethod
+    def _warehouse_story(products, suppliers, users, shop, opening):
+        """A back warehouse next to the shop floor: bulk stock arrives there, and transfers refill the shop.
+        One transfer is done, one is waiting to be sent, so the warehouse screen has something to act on."""
+        keep = {"ENG-006", "FIL-003", "ELE-004", "BRK-003", "OIL-001", "TRN-001", "TIL-004"}   # these stay low on purpose
+        store, _ = Location.objects.get_or_create(name="Back warehouse", warehouse=shop, defaults=dict(usage=Location.INTERNAL))
+        shelf = Location.objects.get(name="Stock", warehouse=shop)
+        rcp = OperationType.objects.get(warehouse=shop, code=OperationType.RECEIPT)
+        internal = OperationType.objects.get(warehouse=shop, code=OperationType.INTERNAL)
+        reserve = [(p, Decimal(p.max_qty)) for p, _, w in products if w >= 3 and p.internal_ref not in keep][:14]
+        pk = stock.new_picking(rcp, [(p, q, p.cost) for p, q in reserve], partner=suppliers[0], dest=store,
+                               origin="Bulk delivery to warehouse", user=users["warehouse"])
+        stock.validate_picking(pk)
+        StockMove.objects.filter(picking=pk).update(date=timezone.make_aware(datetime.combine(opening, time(10, 0))))
+        sent = stock.new_picking(internal, [(p, max(Decimal(10), q / 8)) for p, q in reserve[:6]], source=store, dest=shelf,
+                                 origin="Weekly refill of the shop", user=users["warehouse"])
+        stock.validate_picking(sent)
+        StockMove.objects.filter(picking=sent).update(date=timezone.now() - timedelta(days=2))
+        stock.new_picking(internal, [(p, max(Decimal(10), q / 10)) for p, q in reserve[6:10]], source=store, dest=shelf,
+                          origin="Refill requested by the shop", user=users["keeper"] if "keeper" in users else users["warehouse"])
+        return 2
 
     @staticmethod
     def _purchasing(suppliers, products, users):
@@ -239,7 +279,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _sold_estimate(weight, days):
-        return Decimal(weight * days // 6)
+        return Decimal(weight * days // 4)
 
     def _users(self, password):
         U = get_user_model()

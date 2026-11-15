@@ -5,17 +5,33 @@
   <h1>{{ title }}</h1>
   {% for a in actions %}<form method="post" class="inline">{% csrf_token %}<button class="btn ghost" type="submit">{{ a.label }}</button></form>{% endfor %}
   {% if po_suppliers is not None %}<form method="post" action="{% url 'inventory:po_from_replenishment' %}" class="inline">{% csrf_token %}
-    <select name="supplier" required><option value="">Supplier...</option>{% for s in po_suppliers %}<option value="{{ s.pk }}">{{ s.name }}</option>{% endfor %}</select>
+    <select name="supplier" required aria-label="Supplier"><option value="">Supplier...</option>{% for s in po_suppliers %}<option value="{{ s.pk }}">{{ s.name }}</option>{% endfor %}</select>
     <button class="btn ghost" type="submit">Create purchase order</button></form>{% endif %}
-  <form class="search" method="get"><input name="q" placeholder="Search..." value="{{ request.GET.q }}"></form>
-  <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}
-    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">&lsaquo;</a>{% endif %}
-    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">&rsaquo;</a>{% endif %}</span>
+  {% if export %}<a class="btn ghost" href="{% url 'inventory:export' export %}">Export to Excel</a>{% endif %}
 </div>
+{% if kpis %}<div class="rkpis">{% for k in kpis %}
+  {% if k.url %}<a class="rk {{ k.tone }}" href="{{ k.url }}">{% else %}<div class="rk {{ k.tone }}">{% endif %}
+    <span class="rk-l">{{ k.label }}</span><b class="rk-v{% if k.small %} sm{% endif %}">{{ k.value }}</b>
+  {% if k.url %}</a>{% else %}</div>{% endif %}{% endfor %}</div>{% endif %}
+<form class="filters" method="get">
+  {% if search %}<input type="search" name="q" placeholder="Search name or reference" value="{{ request.GET.q }}" aria-label="Search">{% endif %}
+  {% for f in filters %}
+    {% if f.type == "date" %}<label class="fl">{{ f.label }} <input type="date" name="{{ f.name }}" value="{{ f.value }}" onchange="this.form.submit()"></label>
+    {% else %}<select name="{{ f.name }}" onchange="this.form.submit()" aria-label="{{ f.label }}"><option value="">{{ f.label }}</option>
+      {% for v, l in f.options %}<option value="{{ v }}" {% if v == f.value %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>{% endif %}
+  {% endfor %}
+  {% if request.GET.product %}<input type="hidden" name="product" value="{{ request.GET.product }}">{% endif %}
+  {% if sort %}<input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dirn }}">{% endif %}
+  {% if search or filters %}<button class="btn ghost" type="submit">Apply</button>{% endif %}
+  {% if flt_active %}<a class="clear" href="?">Clear filters</a>{% endif %}
+  <span class="pager">{{ page.start_index }}-{{ page.end_index }} / {{ page.paginator.count }}
+    {% if page.has_previous %}<a href="?{{ pq }}page={{ page.previous_page_number }}" aria-label="Previous page">&lsaquo;</a>{% endif %}
+    {% if page.has_next %}<a href="?{{ pq }}page={{ page.next_page_number }}" aria-label="Next page">&rsaquo;</a>{% endif %}</span>
+</form>
 {% if note %}<p class="note">{{ note }}</p>{% endif %}
-<table class="list"><thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
-{% for cells, url in page %}
-<tr{% if url %} class="click" data-href="{{ url }}"{% endif %}>{% for c in cells %}<td>{{ c }}</td>{% endfor %}</tr>
-{% empty %}<tr><td colspan="{{ headers|length }}" class="empty">Nothing here yet.</td></tr>
+<table class="list"><thead><tr>{% for h in heads %}<th{% if h.num %} class="num"{% endif %}{% if h.active %} aria-sort="{% if h.dir == 'desc' %}descending{% else %}ascending{% endif %}"{% endif %}><a class="sortlink{% if h.active %} on{% endif %}" href="{{ h.url }}">{{ h.label }}{% if h.active %}<span aria-hidden="true">{% if h.dir == "desc" %} &#9660;{% else %} &#9650;{% endif %}</span>{% endif %}</a></th>{% endfor %}</tr></thead><tbody>
+{% for r in body %}
+<tr{% if r.url %} class="click" data-href="{{ r.url }}"{% endif %}>{% for c in r.cells %}<td{% if c.num %} class="num"{% endif %}>{% if c.pill %}<span class="pill {{ c.pill }}">{{ c.v }}</span>{% else %}{{ c.v }}{% endif %}</td>{% endfor %}</tr>
+{% empty %}<tr><td colspan="{{ ncols }}" class="empty">{{ empty }}{% if flt_active %} <a href="?">Clear filters</a>{% endif %}</td></tr>
 {% endfor %}</tbody></table>
 {% endblock %}

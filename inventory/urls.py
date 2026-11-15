@@ -37,6 +37,7 @@ urlpatterns = [
     path("users/<int:pk>/", v.user_edit, name="user_edit"),
     path("data/", v.data_page, name="data"),
     path("data/backup/", v.backup_download, name="backup"),
+    path("data/demo-reset/", v.demo_reset, name="demo_reset"),
     path("data/export/<slug:kind>.xlsx", v.export_xlsx, name="export"),
     path("audit/", v.audit_log, name="audit"),
     path("config/sync/", v.sync_peers, name="sync"),

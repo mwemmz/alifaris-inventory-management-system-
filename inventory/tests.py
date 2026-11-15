@@ -611,3 +611,73 @@ class PurchaseAndData(Base):
         ws = load_workbook(_io.BytesIO(self.client.get("/inventory/data/export/products.xlsx").content)).active
         self.assertEqual(ws["A1"].value, "Ref")
         self.assertEqual(ws.max_row, 2)
+
+
+class ReportPages(Base):
+    """Reporting screens must act, not just list: filter, sort, total, drill down and export."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import ProductCategory
+        U = get_user_model()
+        self.boss = U.objects.create_user("repboss", password="pw", is_staff=True)
+        self.client.force_login(self.boss)
+        cat = ProductCategory.objects.create(name="Brakes")
+        self.p.category, self.p.min_qty = cat, Decimal("5")
+        self.p.save()
+
+    def _stock_in(self, qty):
+        from .models import Location, OperationType
+        op = OperationType.objects.get(code=OperationType.RECEIPT)
+        pk = stock.new_picking(op, [(self.p, Decimal(qty), Decimal("10"))])
+        stock.validate_picking(pk)
+
+    def test_stock_report_status_filter_and_kpis(self):
+        self._stock_in(2)                                    # below the minimum of 5
+        r = self.client.get("/inventory/reporting/stock/")
+        self.assertContains(r, "Low stock")
+        self.assertContains(r, "Export to Excel")
+        self.assertContains(r, "status=low")                 # the Low stock card applies a filter
+        low = self.client.get("/inventory/reporting/stock/?status=low")
+        self.assertContains(low, self.p.name)
+        ok = self.client.get("/inventory/reporting/stock/?status=ok")
+        self.assertNotContains(ok, self.p.name)
+
+    def test_sorting_and_pager_keep_filters(self):
+        self._stock_in(8)
+        r = self.client.get("/inventory/reporting/stock/?category=%d&sort=3&dir=desc" % self.p.category_id)
+        self.assertContains(r, 'aria-sort="descending"')
+        self.assertContains(r, "category=%d" % self.p.category_id)
+
+    def test_valuation_totals_and_drilldown(self):
+        self._stock_in(4)
+        r = self.client.get("/inventory/reporting/valuation/")
+        self.assertContains(r, "Total stock value")
+        self.assertContains(r, f'data-href="/inventory/products/{self.p.pk}/"')
+
+    def test_analysis_row_opens_filtered_moves(self):
+        self._stock_in(3)
+        a = self.client.get("/inventory/reporting/analysis/")
+        self.assertContains(a, f"/inventory/reporting/moves/?product={self.p.pk}")
+        m = self.client.get(f"/inventory/reporting/moves/?product={self.p.pk}")
+        self.assertContains(m, "Units in")
+        self.assertContains(m, self.p.name)
+        none = self.client.get("/inventory/reporting/moves/?type=delivery")
+        self.assertContains(none, "No moves match")
+
+    def test_moves_date_filter(self):
+        self._stock_in(3)
+        r = self.client.get("/inventory/reporting/moves/?from=2999-01-01")
+        self.assertContains(r, "No moves match")
+
+    def test_exports_exist_for_every_report(self):
+        for kind in ("products", "valuation", "moves", "locations", "analysis"):
+            r = self.client.get(f"/inventory/data/export/{kind}.xlsx")
+            self.assertEqual(r.status_code, 200, kind)
+
+    def test_demo_reset_refuses_on_a_live_shop(self):
+        import os
+        os.environ.pop("ALIFARIS_DEMO", None)
+        r = self.client.post("/inventory/data/demo-reset/", follow=True)
+        self.assertContains(r, "only available")
+        self.assertTrue(self.p.__class__.objects.filter(pk=self.p.pk).exists())

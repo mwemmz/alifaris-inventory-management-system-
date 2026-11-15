@@ -3,11 +3,11 @@
 <style>.delta{font-size:13px}.up{color:#15803d}.down{color:#b91c1c}.big{font-size:28px;font-weight:700}.kpis .card a{color:inherit}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}.alert{border-left:4px solid #e8913a}.bad{border-left-color:#b91c1c}.ok{border-left-color:#15803d}</style>
 <h2>Dashboard <small>{{ today|date:"l d F Y" }} <a href="#" id="rf" style="font-size:12px">refreshes every minute</a></small></h2>
 <div class="kpis">
- <div class="card"><div class="big"><small>ZK</small> {{ kpi.today|floatformat:"0g" }}</div>Sales today<br>
+ <a class="card" href="{% url 'bi:sales' %}"><div class="big"><small>ZK</small> {{ kpi.today|floatformat:"0g" }}</div>Sales today<br>
   <span class="delta">{% if kpi.vs_yest is not None %}<span class="{% if kpi.vs_yest >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_yest|stringformat:"+d" }}%</span> vs yesterday ({{ kpi.yest|floatformat:0 }}){% else %}no sales yesterday{% endif %}</span><br>
-  <span class="delta">{% if kpi.vs_week is not None %}<span class="{% if kpi.vs_week >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_week|stringformat:"+d" }}%</span> vs same day last week{% endif %}</span></div>
- <div class="card"><div class="big">{{ kpi.orders }}</div>Orders today<br><span class="delta">Average {{ kpi.avg }}</span></div>
- <div class="card"><div class="big"><small>ZK</small> {{ kpi.mtd|floatformat:"0g" }}</div>Month to date<br><span class="delta">{% if kpi.mtd_vs is not None %}<span class="{% if kpi.mtd_vs >= 0 %}up{% else %}down{% endif %}">{{ kpi.mtd_vs|stringformat:"+d" }}%</span> vs same days last month{% endif %} · {{ kpi.mtd_orders }} orders</span></div>
+  <span class="delta">{% if kpi.vs_week is not None %}<span class="{% if kpi.vs_week >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_week|stringformat:"+d" }}%</span> vs same day last week{% endif %}</span></a>
+ <a class="card" href="{% url 'pos:order_list' %}"><div class="big">{{ kpi.orders }}</div>Orders today<br><span class="delta">Average {{ kpi.avg }}</span></a>
+ <a class="card" href="{% url 'bi:sales' %}"><div class="big"><small>ZK</small> {{ kpi.mtd|floatformat:"0g" }}</div>Month to date<br><span class="delta">{% if kpi.mtd_vs is not None %}<span class="{% if kpi.mtd_vs >= 0 %}up{% else %}down{% endif %}">{{ kpi.mtd_vs|stringformat:"+d" }}%</span> vs same days last month{% endif %} · {{ kpi.mtd_orders }} orders</span></a>
  <div class="card"><div class="big"><small>ZK</small> {{ stock_value|floatformat:"0g" }}</div>Stock value (cost)<br><span class="delta"><a href="{% url 'bi:stock' %}">Stock analysis</a></span></div>
 </div>
 <div class="tiles">

@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 from . import audit, forms as f
 from .models import (SyncPeer, ApiToken, LandedCost, Location, OperationType, Partner, Picking, Product, PurchaseOrder, Scrap, StockMove, StockQuant,
                      ZraConfig, ZraLog)
-from .services import importer, stock, sync as sync_service, zra
+from .services import demo as demo_service, importer, stock, sync as sync_service, zra
 from .permissions import (WM_CONFIG_KEYS, can_edit, can_manage_stock, editor_required, is_warehouse_manager,
                           post_needs_editor)
 from .services.stock import StockError
@@ -32,13 +32,94 @@ def ctx(request, **extra):
     return base
 
 
+class Pill:
+    """A coloured badge inside a table cell. kind: ok, plan (amber), bad (red)."""
+
+    def __init__(self, text, kind="ok"):
+        self.text, self.kind = text, kind
+
+    def __str__(self):
+        return self.text
+
+
+def _fmt_num(v):
+    if isinstance(v, Decimal):
+        s = f"{v:,.3f}".rstrip("0").rstrip(".")
+        return s or "0"
+    if isinstance(v, float):
+        return f"{v:,.2f}".rstrip("0").rstrip(".")
+    return f"{v:,}"
+
+
+def _cell(c):
+    if isinstance(c, Pill):
+        return {"v": c.text, "pill": c.kind}
+    if isinstance(c, (Decimal, int, float)) and not isinstance(c, bool):
+        return {"v": _fmt_num(c), "num": True}
+    return {"v": "" if c is None else c}
+
+
+def _sort_key(v):
+    if isinstance(v, Pill):
+        return (1, str(v).lower())
+    if isinstance(v, (Decimal, int, float)) and not isinstance(v, bool):
+        return (0, float(v))
+    return (1, str(v).lower())
+
+
+def qs_with(request, **changes):
+    """Current query string with some params replaced (None removes one). Used for KPI cards that apply a filter."""
+    q = request.GET.copy()
+    q.pop("page", None)
+    for k, v in changes.items():
+        if v is None:
+            q.pop(k, None)
+        else:
+            q[k] = v
+    s = q.urlencode()
+    return "?" + s if s else "?"
+
+
 def table(request, title, headers, rows, *, new_url=None, new_label="New", back=None, note=None, actions=None,
-          po_suppliers=None):
-    """Generic list page. rows = list of (cells, url_or_None)."""
+          po_suppliers=None, kpis=None, filters=None, export=None, empty="Nothing here yet.", search=True):
+    """Generic list/report page. rows = list of (cells, url_or_None).
+    kpis: [{label, value, tone, url}]; filters: [{name, label, options|type, value}]; export: an exports.BUILDERS key."""
+    sort = request.GET.get("sort", "")
+    dirn = "desc" if request.GET.get("dir") == "desc" else "asc"
+    if sort.isdigit() and int(sort) < len(headers):
+        i = int(sort)
+        rows = sorted(rows, key=lambda r: _sort_key(r[0][i]), reverse=(dirn == "desc"))
+    heads = []
+    first = rows[0][0] if rows else []
+    for i, h in enumerate(headers):
+        q = request.GET.copy()
+        q.pop("page", None)
+        q["sort"], q["dir"] = str(i), ("desc" if (sort == str(i) and dirn == "asc") else "asc")
+        heads.append({"label": h, "url": "?" + q.urlencode(), "active": sort == str(i), "dir": dirn,
+                      "num": i < len(first) and isinstance(first[i], (Decimal, int, float)) and not isinstance(first[i], bool)})
     page = Paginator(rows, 80).get_page(request.GET.get("page"))
-    return render(request, "inventory/table.html", ctx(request, title=title, headers=headers, page=page,
-                                                        new_url=new_url, new_label=new_label, note=note,
-                                                        actions=actions or [], po_suppliers=po_suppliers))
+    body = [{"cells": [_cell(c) for c in cells], "url": url} for cells, url in page]
+    keep = request.GET.copy()
+    for k in ("page",):
+        keep.pop(k, None)
+    pq = keep.urlencode()
+    flt_active = any(request.GET.get(f_["name"]) for f_ in (filters or [])) or bool(request.GET.get("q"))
+    return render(request, "inventory/table.html", ctx(
+        request, title=title, heads=heads, body=body, page=page, new_url=new_url, new_label=new_label, note=note,
+        actions=actions or [], po_suppliers=po_suppliers, kpis=kpis or [], filters=filters or [], export=export,
+        empty=empty, search=search, pq=(pq + "&") if pq else "", sort=sort, dirn=dirn, flt_active=flt_active,
+        ncols=len(headers)))
+
+
+def _category_filter(request):
+    from .models import ProductCategory
+    return {"name": "category", "label": "All categories", "value": request.GET.get("category", ""),
+            "options": [(str(c.pk), c.name) for c in ProductCategory.objects.order_by("name")]}
+
+
+def _on_hand_map():
+    return {r["product"]: r["t"] for r in StockQuant.objects.filter(location__usage=Location.INTERNAL)
+            .values("product").annotate(t=Sum("qty"))}
 
 
 # ---------------------------------------------------------------- overview
@@ -325,11 +406,35 @@ def product_zra(request, pk):
 # ---------------------------------------------------------------- reporting
 @login_required
 def report_stock(request):
-    qs = Product.objects.filter(product_type=Product.GOODS, active=True)
-    if q := request.GET.get("q"):
-        qs = qs.filter(Q(name__icontains=q) | Q(internal_ref__iexact=q))
-    rows = [([p.internal_ref, p.name, p.on_hand, p.uom or ""], f"/inventory/products/{p.pk}/") for p in qs]
-    return table(request, "Stock", ["Ref", "Product", "On hand", "Unit"], rows, note="Search with ?q=text")
+    qs = Product.objects.filter(product_type=Product.GOODS, active=True).select_related("category", "uom").order_by("name")
+    if q := request.GET.get("q", "").strip():
+        qs = qs.filter(Q(name__icontains=q) | Q(internal_ref__iexact=q) | Q(barcode=q))
+    if cat := request.GET.get("category"):
+        qs = qs.filter(category_id=cat)
+    have = _on_hand_map()
+    items = []
+    for p in qs:
+        oh = have.get(p.pk, Decimal("0"))
+        status = "out" if oh <= 0 else "low" if p.min_qty and oh < p.min_qty else "ok"
+        items.append((p, oh, status))
+    count = {s: sum(1 for i in items if i[2] == s) for s in ("out", "low", "ok")}
+    status_f = request.GET.get("status", "")
+    shown = [i for i in items if not status_f or i[2] == status_f]
+    pill = {"out": Pill("Out of stock", "bad"), "low": Pill("Low", "plan"), "ok": Pill("In stock", "ok")}
+    rows = [([p.internal_ref, p.name, p.category.name if p.category else "", oh, p.min_qty or "", pill[s], p.uom or ""],
+             f"/inventory/products/{p.pk}/") for p, oh, s in shown]
+    kpis = [{"label": "Products", "value": len(items), "url": qs_with(request, status=None)},
+            {"label": "Units on hand", "value": _fmt_num(sum((i[1] for i in items), Decimal("0")))},
+            {"label": "Low stock", "value": count["low"], "tone": "plan" if count["low"] else "", "url": qs_with(request, status="low")},
+            {"label": "Out of stock", "value": count["out"], "tone": "bad" if count["out"] else "", "url": qs_with(request, status="out")}]
+    filters = [_category_filter(request),
+               {"name": "status", "label": "Any status", "value": status_f,
+                "options": [("ok", "In stock"), ("low", "Low"), ("out", "Out of stock")]}]
+    return table(request, "Stock", ["Ref", "Product", "Category", "On hand", "Reorder at", "Status", "Unit"], rows,
+                 kpis=kpis, filters=filters, export="products", empty="No products match these filters.",
+                 note="Click a column heading to sort, a number above to filter, or a row to open the product.",
+                 po_suppliers=(Partner.objects.filter(is_supplier=True).order_by("name")
+                               if status_f in ("low", "out") and rows and can_manage_stock(request.user) else None))
 
 
 @login_required
@@ -337,40 +442,104 @@ def report_locations(request):
     qs = StockQuant.objects.exclude(qty=0).select_related("product", "location", "location__warehouse")
     if loc := request.GET.get("location"):
         qs = qs.filter(location_id=loc)
-    rows = [([q.location.full_name, q.product.internal_ref, q.product.name, q.qty], None) for q in qs.order_by("location_id", "product__name")]
-    return table(request, "Stock by location", ["Location", "Ref", "Product", "Quantity"], rows)
+    if q := request.GET.get("q", "").strip():
+        qs = qs.filter(Q(product__name__icontains=q) | Q(product__internal_ref__iexact=q))
+    qs = qs.filter(location__usage=Location.INTERNAL).order_by("location_id", "product__name")
+    data = list(qs)
+    rows = [([x.location.full_name, x.product.internal_ref, x.product.name, x.qty], f"/inventory/products/{x.product_id}/") for x in data]
+    per_loc = {}
+    for x in data:
+        per_loc[x.location.full_name] = per_loc.get(x.location.full_name, Decimal("0")) + x.qty
+    kpis = [{"label": "Locations holding stock", "value": len(per_loc)},
+            {"label": "Products", "value": len({x.product_id for x in data})},
+            {"label": "Units", "value": _fmt_num(sum(per_loc.values(), Decimal("0")))}]
+    kpis += [{"label": name, "value": _fmt_num(units), "url": qs_with(request, location=str(next(
+        x.location_id for x in data if x.location.full_name == name)))} for name, units in list(per_loc.items())[:3] if len(per_loc) > 1]
+    filters = [{"name": "location", "label": "All locations", "value": request.GET.get("location", ""),
+                "options": [(str(l.pk), l.full_name) for l in Location.objects.filter(usage=Location.INTERNAL)]}]
+    return table(request, "Stock by location", ["Location", "Ref", "Product", "Quantity"], rows, kpis=kpis, filters=filters,
+                 export="locations", empty="No stock in this location.",
+                 note="Where each product sits, for example the shop shelf against the main warehouse.")
 
 
 @login_required
 def report_moves(request):
+    from datetime import date
     qs = StockMove.objects.select_related("product", "source", "dest", "picking", "picking__op_type")
-    if q := request.GET.get("q"):
+    if q := request.GET.get("q", "").strip():
         qs = qs.filter(Q(product__name__icontains=q) | Q(product__internal_ref__iexact=q) | Q(picking__ref__icontains=q))
-    rows = [([m.date.strftime("%Y-%m-%d %H:%M"), m.picking.ref if m.picking_id else m.reason, m.product,
-              m.source.full_name, m.dest.full_name, m.qty, m.site_code], None) for m in qs[:2000]]
-    return table(request, "Moves History", ["Date", "Reference", "Product", "From", "To", "Quantity", "Site"], rows,
-                 note="Newest 2000 moves shown. Search with ?q=text")
+    if pid := request.GET.get("product", ""):
+        qs = qs.filter(product_id=pid) if pid.isdigit() else qs
+    kind = request.GET.get("type", "")
+    if kind in ("receipt", "delivery", "internal"):
+        qs = qs.filter(picking__op_type__code=kind)
+    elif kind == "adjustment":
+        qs = qs.filter(picking__isnull=True)
+    for key, lookup in (("from", "date__date__gte"), ("to", "date__date__lte")):
+        try:
+            qs = qs.filter(**{lookup: date.fromisoformat(request.GET.get(key, ""))})
+        except ValueError:
+            pass
+    inn = Location.INTERNAL
+    agg = qs.aggregate(n=Count("id"), got=Sum("qty", filter=Q(dest__usage=inn) & ~Q(source__usage=inn)),
+                       sent=Sum("qty", filter=Q(source__usage=inn) & ~Q(dest__usage=inn)))
+    rows = [([m.date.strftime("%Y-%m-%d %H:%M"), m.picking.ref if m.picking_id else (m.reason or "Adjustment"), m.product,
+              m.source.full_name, m.dest.full_name, m.qty, m.site_code],
+             f"/inventory/transfer/{m.picking_id}/" if m.picking_id else None) for m in qs.order_by("-date")[:2000]]
+    kpis = [{"label": "Moves", "value": agg["n"] or 0}, {"label": "Units in", "value": _fmt_num(agg["got"] or Decimal("0")), "tone": "ok"},
+            {"label": "Units out", "value": _fmt_num(agg["sent"] or Decimal("0"))}]
+    filters = [{"name": "type", "label": "All types", "value": kind,
+                "options": [("receipt", "Receipts"), ("delivery", "Deliveries and sales"), ("internal", "Transfers"), ("adjustment", "Adjustments")]},
+               {"name": "from", "label": "From", "type": "date", "value": request.GET.get("from", "")},
+               {"name": "to", "label": "To", "type": "date", "value": request.GET.get("to", "")}]
+    pname = Product.objects.filter(pk=pid).first() if pid.isdigit() else None
+    return table(request, "Moves History", ["Date", "Reference", "Product", "From", "To", "Quantity", "Site"], rows, kpis=kpis,
+                 filters=filters, export="moves", empty="No moves match these filters.",
+                 note=(f"Showing moves for {pname.name}. " if pname else "") + "Newest 2000 moves shown. Click a row to open its document.")
 
 
 @login_required
 def report_analysis(request):
     inn = Location.INTERNAL
-    qs = (StockMove.objects.values("product__internal_ref", "product__name")
-          .annotate(received=Sum("qty", filter=Q(dest__usage=inn) & ~Q(source__usage=inn)),
-                    sent=Sum("qty", filter=Q(source__usage=inn) & ~Q(dest__usage=inn)), n=Count("id"))
+    qs = StockMove.objects.values("product", "product__internal_ref", "product__name", "product__category")
+    if q := request.GET.get("q", "").strip():
+        qs = qs.filter(Q(product__name__icontains=q) | Q(product__internal_ref__iexact=q))
+    if cat := request.GET.get("category"):
+        qs = qs.filter(product__category_id=cat)
+    qs = (qs.annotate(received=Sum("qty", filter=Q(dest__usage=inn) & ~Q(source__usage=inn)),
+                      sent=Sum("qty", filter=Q(source__usage=inn) & ~Q(dest__usage=inn)), n=Count("id"))
           .order_by("product__name"))
-    rows = [([r["product__internal_ref"], r["product__name"], r["received"] or 0, r["sent"] or 0, r["n"]], None) for r in qs]
-    return table(request, "Moves Analysis", ["Ref", "Product", "Total in", "Total out", "Moves"], rows,
-                 note="Quantities entering and leaving your internal locations (transfers between your own locations are excluded).")
+    data = list(qs)
+    rows = [([r["product__internal_ref"], r["product__name"], r["received"] or 0, r["sent"] or 0,
+              (r["received"] or 0) - (r["sent"] or 0), r["n"]], f"/inventory/reporting/moves/?product={r['product']}") for r in data]
+    got = sum((r["received"] or 0 for r in data), Decimal("0"))
+    sent = sum((r["sent"] or 0 for r in data), Decimal("0"))
+    kpis = [{"label": "Total in", "value": _fmt_num(got), "tone": "ok"}, {"label": "Total out", "value": _fmt_num(sent)},
+            {"label": "Net change", "value": _fmt_num(got - sent)}, {"label": "Products moved", "value": len(data)}]
+    return table(request, "Moves Analysis", ["Ref", "Product", "Total in", "Total out", "Net", "Moves"], rows, kpis=kpis,
+                 filters=[_category_filter(request)], export="analysis", empty="Nothing moved yet.",
+                 note="Quantities entering and leaving your locations (transfers between your own locations are excluded). "
+                      "Sort by Total out to see what sells fastest, then click a row to see its moves.")
 
 
 @login_required
 def report_valuation(request):
     data = stock.stock_valuation()
-    rows = [([r["product"].internal_ref, r["product"].name, r["qty"], r["cost"], f"{r['value']:.2f}"], None) for r in data]
+    if cat := request.GET.get("category"):
+        data = [r for r in data if str(r["product"].category_id) == cat]
+    if q := request.GET.get("q", "").strip():
+        data = [r for r in data if q.lower() in r["product"].name.lower() or q.lower() == r["product"].internal_ref.lower()]
     total = sum((r["value"] for r in data), Decimal("0"))
-    return table(request, "Valuation", ["Ref", "Product", "On hand", "Unit cost", "Value"], rows,
-                 note=f"Total stock value: {total:,.2f} ZK (on hand x average cost)")
+    rows = [([r["product"].internal_ref, r["product"].name, r["product"].category.name if r["product"].category else "",
+              r["qty"], r["cost"], r["value"], f"{(r['value'] * 100 / total):.1f}%" if total else "0%"],
+             f"/inventory/products/{r['product'].pk}/") for r in data]
+    top = max(data, key=lambda r: r["value"], default=None)
+    kpis = [{"label": "Total stock value (ZK)", "value": _fmt_num(total.quantize(Decimal("1")))},
+            {"label": "Products valued", "value": len(data)},
+            {"label": "Most capital tied up", "value": top["product"].name if top else "-", "small": True}]
+    return table(request, "Valuation", ["Ref", "Product", "Category", "On hand", "Unit cost", "Value", "Share"], rows, kpis=kpis,
+                 filters=[_category_filter(request)], export="valuation", empty="No stock to value.",
+                 note="On hand x average cost. Sort by Value to see where your money is sitting.")
 
 
 # ---------------------------------------------------------------- configuration
@@ -727,7 +896,7 @@ def export_xlsx(request, kind):
     from datetime import date
     from .services import exports
     # money and sales detail are for managers; a storekeeper may take the product and stock lists
-    allowed = {"products", "valuation", "moves", "purchases"} if can_manage_stock(request.user) else set()
+    allowed = {"products", "valuation", "moves", "purchases", "locations", "analysis"} if can_manage_stock(request.user) else set()
     if request.user.is_staff:
         allowed = set(exports.BUILDERS)
     if kind not in exports.BUILDERS or kind not in allowed:
@@ -753,4 +922,17 @@ def data_page(request):
     return render(request, "inventory/data.html", ctx(request, title="Backup and exports", kinds=[
         ("products", "Products and prices"), ("valuation", "Stock valuation"), ("moves", "Stock movements"),
         ("purchases", "Purchase orders"), ("sales", "Sales with profit"), ("receivables", "Customers who owe")],
-        is_manager=request.user.is_staff, can_backup=__import__("inventory.services.backup", fromlist=["x"]).is_sqlite()))
+        is_manager=request.user.is_staff, can_backup=__import__("inventory.services.backup", fromlist=["x"]).is_sqlite(),
+        demo_mode=request.user.is_staff and demo_service.enabled(), demo_running=demo_service.running()))
+
+
+@staff_required
+@require_POST
+def demo_reset(request):
+    try:
+        demo_service.reset_in_background()
+    except demo_service.DemoResetError as e:
+        messages.error(request, str(e))
+        return redirect("inventory:data")
+    messages.success(request, "Resetting the demo. This takes about a minute: you will be logged out. Log in again as manager.")
+    return redirect("inventory:data")

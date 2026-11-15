@@ -12,5 +12,11 @@
   <p><a class="btn" href="{% url 'inventory:backup' %}">Download backup now</a></p>
   <p class="note">Automatic daily backups: schedule <code>python manage.py backup_db --to backups --keep 14</code> on the server.</p>
   {% endif %}{% endif %}
+  {% if demo_mode %}
+  <h3>Demo data</h3>
+  <p class="note">This is a demo installation. Reset replaces everything with fresh sample data (products, 45 days of sales, customers, warehouse transfers). Never available on a live shop.</p>
+  <form method="post" action="{% url 'inventory:demo_reset' %}" onsubmit="return confirm('Wipe all data and load fresh demo data? You will be logged out.')">{% csrf_token %}
+    <button class="btn ghost" type="submit"{% if demo_running %} disabled{% endif %}>{% if demo_running %}Reset running...{% else %}Reset demo data{% endif %}</button></form>
+  {% endif %}
 </div>
 {% endblock %}

@@ -65,7 +65,26 @@ def purchases():
     return "Purchase orders", ["Reference", "Supplier", "Ordered", "Expected", "Status", "Total (ZMW)"], rows
 
 
-BUILDERS = {"products": products, "valuation": valuation, "moves": moves, "sales": sales,
+def locations():
+    from ..models import Location, StockQuant
+    rows = [[q.location.full_name, q.product.internal_ref, q.product.name, q.qty]
+            for q in StockQuant.objects.filter(location__usage=Location.INTERNAL).exclude(qty=0)
+            .select_related("product", "location").order_by("location_id", "product__name")]
+    return "Stock by location", ["Location", "Ref", "Product", "Quantity"], rows
+
+
+def analysis():
+    from django.db.models import Count, Q, Sum
+    from ..models import Location
+    inn = Location.INTERNAL
+    qs = (StockMove.objects.values("product__internal_ref", "product__name")
+          .annotate(got=Sum("qty", filter=Q(dest__usage=inn) & ~Q(source__usage=inn)),
+                    sent=Sum("qty", filter=Q(source__usage=inn) & ~Q(dest__usage=inn)), n=Count("id")).order_by("product__name"))
+    return "Moves analysis", ["Ref", "Product", "Total in", "Total out", "Net", "Moves"], [
+        [r["product__internal_ref"], r["product__name"], r["got"] or 0, r["sent"] or 0, (r["got"] or 0) - (r["sent"] or 0), r["n"]] for r in qs]
+
+
+BUILDERS = {"locations": locations, "analysis": analysis, "products": products, "valuation": valuation, "moves": moves, "sales": sales,
             "receivables": receivables, "purchases": purchases}
 
 
