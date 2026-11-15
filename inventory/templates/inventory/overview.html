@@ -2,13 +2,23 @@
 {% block body %}
 <div class="cp"><h1>Inventory Overview</h1></div>
 {% if low %}<div class="msg warning">{{ low }} product(s) are below their reorder minimum. <a href="{% url 'inventory:replenishment' %}">See replenishment</a></div>{% endif %}
+{% if health %}
+<div class="health">
+  <a class="card hcard" href="{% url 'inventory:report_stock' %}"><span class="lbl">Active products</span><b>{{ health.products }}</b></a>
+  <a class="card hcard" href="{% url 'inventory:report_locations' %}"><span class="lbl">Units on hand</span><b>{{ health.units|floatformat:"0g" }}</b></a>
+  <a class="card hcard" href="{% url 'inventory:report_valuation' %}"><span class="lbl">Stock value</span><b><small>ZK</small>{{ health.value|floatformat:"0g" }}</b></a>
+  <a class="card hcard {% if health.low %}warn{% endif %}" href="{% url 'inventory:report_stock' %}?status=low"><span class="lbl">Low stock</span><b>{{ health.low }}</b></a>
+  <a class="card hcard {% if health.out %}bad{% endif %}" href="{% url 'inventory:report_stock' %}?status=out"><span class="lbl">Out of stock</span><b>{{ health.out }}</b></a>
+</div>
+{% endif %}
 <div class="cards">
 {% for c in cards %}
   <section class="card">
     <h2>{{ c.title }}</h2><div class="sub">{{ site_code }}</div>
     <div class="stats"><div><b>{{ c.draft }}</b><span>To process</span></div><div><b>{{ c.done }}</b><span>Done</span></div></div>
-    <a class="btn" href="{% if c.pos %}{% url 'pos:order_list' %}{% else %}{% url 'inventory:picking_list' c.slug %}{% endif %}">Open</a>
-    {% if not c.pos %}<a class="btn ghost" href="{% url 'inventory:picking_new' c.slug %}">New</a>{% endif %}
+    <div class="prog" title="{{ c.pct }}% done"><i style="width:{{ c.pct }}%"></i></div>
+    <div class="acts"><a class="btn" href="{% if c.pos %}{% url 'pos:order_list' %}{% else %}{% url 'inventory:picking_list' c.slug %}{% endif %}">Open</a>
+    {% if not c.pos %}<a class="btn ghost" href="{% url 'inventory:picking_new' c.slug %}">New</a>{% endif %}</div>
   </section>
 {% endfor %}
 </div>

@@ -44,4 +44,9 @@
   document.addEventListener('click',function(e){if(!e.target.closest('.pop'))closeAll();});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll();});
   if(btns.length)load();
+
+  // Highlight where you are in the bar
+  var path=location.pathname;
+  document.querySelectorAll('.menus>a,.posbar nav a').forEach(function(a){var h=a.getAttribute('href');if(h&&h!=='/'&&(path===h||(h.length>1&&path.indexOf(h)===0&&h.split('/').length>3)))a.classList.add('on');});
+  document.querySelectorAll('.dd').forEach(function(d){if(d.querySelector('.dd-menu a[href="'+path+'"]')||[].some.call(d.querySelectorAll('.dd-menu a'),function(a){var h=a.getAttribute('href');return h&&h.split('/').length>3&&path.indexOf(h)===0;}))d.classList.add('on');});
 })();

@@ -14,6 +14,7 @@
 <body class="{% block bodyclass %}{% endblock %}">
 {% block content %}{% endblock %}
 <link rel="stylesheet" href="{% static 'launcher/brand.css' %}">
+<link rel="stylesheet" href="{% static 'launcher/premium.css' %}">
 <script src="{% static 'launcher/launcher.js' %}"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(){});});}</script>
 </body>

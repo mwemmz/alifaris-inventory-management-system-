@@ -134,8 +134,20 @@ def overview(request):
     pos = PosOrder.objects.filter(kind=PosOrder.SALE)
     cards.append({"title": "PoS Orders", "slug": "deliveries", "draft": pos.filter(zra_status__in=["pending", "failed"]).count(),
                   "done": pos.count(), "pos": True})
-    low = len(stock.replenishment_candidates())
-    return render(request, "inventory/overview.html", ctx(request, cards=cards, low=low,
+    for c in cards:
+        total = c["draft"] + c["done"]
+        c["pct"] = round(c["done"] * 100 / total) if total else 0
+    cands = stock.replenishment_candidates()
+    low = len(cands)
+    health = None
+    try:
+        val = stock.stock_valuation()
+        health = {"products": Product.objects.filter(active=True).count(),
+                  "units": sum((r["qty"] for r in val), Decimal("0")), "value": sum((r["value"] for r in val), Decimal("0")),
+                  "low": low, "out": sum(1 for r in cands if r["on_hand"] <= 0)}
+    except Exception:
+        pass  # the overview must always load
+    return render(request, "inventory/overview.html", ctx(request, cards=cards, low=low, health=health,
                                                           products=Product.objects.filter(active=True).count()))
 
 

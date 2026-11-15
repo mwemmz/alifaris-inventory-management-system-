@@ -1,32 +1,63 @@
 {% extends "bi/base.html" %}
 {% block page %}
-<style>.delta{font-size:13px}.up{color:#15803d}.down{color:#b91c1c}.big{font-size:28px;font-weight:700}.kpis .card a{color:inherit}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}.alert{border-left:4px solid #e8913a}.bad{border-left-color:#b91c1c}.ok{border-left-color:#15803d}</style>
-<h2>Dashboard <small>{{ today|date:"l d F Y" }} <a href="#" id="rf" style="font-size:12px">refreshes every minute</a></small></h2>
-<div class="kpis">
- <a class="card" href="{% url 'bi:sales' %}"><div class="big"><small>ZK</small> {{ kpi.today|floatformat:"0g" }}</div>Sales today<br>
-  <span class="delta">{% if kpi.vs_yest is not None %}<span class="{% if kpi.vs_yest >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_yest|stringformat:"+d" }}%</span> vs yesterday ({{ kpi.yest|floatformat:0 }}){% else %}no sales yesterday{% endif %}</span><br>
-  <span class="delta">{% if kpi.vs_week is not None %}<span class="{% if kpi.vs_week >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_week|stringformat:"+d" }}%</span> vs same day last week{% endif %}</span></a>
- <a class="card" href="{% url 'pos:order_list' %}"><div class="big">{{ kpi.orders }}</div>Orders today<br><span class="delta">Average {{ kpi.avg }}</span></a>
- <a class="card" href="{% url 'bi:sales' %}"><div class="big"><small>ZK</small> {{ kpi.mtd|floatformat:"0g" }}</div>Month to date<br><span class="delta">{% if kpi.mtd_vs is not None %}<span class="{% if kpi.mtd_vs >= 0 %}up{% else %}down{% endif %}">{{ kpi.mtd_vs|stringformat:"+d" }}%</span> vs same days last month{% endif %} · {{ kpi.mtd_orders }} orders</span></a>
- <div class="card"><div class="big"><small>ZK</small> {{ stock_value|floatformat:"0g" }}</div>Stock value (cost)<br><span class="delta"><a href="{% url 'bi:stock' %}">Stock analysis</a></span></div>
+<div class="dash-head">
+ <div><h1>Dashboard</h1><p>{{ today|date:"l, j F Y" }} · all figures in ZK</p></div>
+ <a href="#" id="rf" class="live" title="Click to stop auto-refresh"><i></i><span>Live · refreshes every minute</span></a>
 </div>
-<div class="tiles">
- <a class="card alert {% if owed %}bad{% else %}ok{% endif %}" href="{% url 'pos:customers' %}"><b>ZK {{ owed|floatformat:"0g" }}</b> owed by customers</a>
- <a class="card alert {% if reorder %}bad{% else %}ok{% endif %}" href="{% url 'bi:insights' %}"><b>{{ reorder }}</b> product(s) to reorder</a>
- {% if zra_on %}<a class="card alert {% if zra_failed %}bad{% elif zra_pending %}{% else %}ok{% endif %}" href="{% url 'pos:report' %}"><b>{{ zra_pending }}</b> sales waiting for ZRA{% if zra_failed %}, <b>{{ zra_failed }}</b> failed{% endif %}</a>{% else %}<div class="card alert">ZRA sending is switched off</div>{% endif %}
- {% for p in peers %}<div class="card alert {% if 'OK' in p.last_result %}ok{% else %}bad{% endif %}"><b>{{ p.name }}</b> sync<br><small>{% if p.last_run %}{{ p.last_run|timesince }} ago{% else %}never run{% endif %} · {{ p.last_result|truncatechars:60 }}</small></div>{% endfor %}
+
+<div class="bento">
+ <a class="card kcard2 hot b-hero" href="{% url 'bi:sales' %}">
+  <span class="lbl">Sales today</span>
+  <span class="num"><small>ZK</small>{{ kpi.today|floatformat:"0g" }}</span>
+  <span class="sub2">
+   {% if kpi.vs_yest is not None %}<span class="chip {% if kpi.vs_yest >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_yest|stringformat:"+d" }}%</span> vs yesterday{% else %}No sales yesterday{% endif %}
+   {% if kpi.vs_week is not None %}<span class="chip {% if kpi.vs_week >= 0 %}up{% else %}down{% endif %}">{{ kpi.vs_week|stringformat:"+d" }}%</span> vs last week{% endif %}
+  </span>
+  <div class="spark" id="spark-hero"></div>
+  <span style="height:34px"></span>
+ </a>
+ <a class="card kcard2 b-kpi" href="{% url 'pos:order_list' %}">
+  <span class="lbl">Orders today</span><span class="num">{{ kpi.orders }}</span>
+  <span class="sub2">Average sale ZK {{ kpi.avg }}</span>
+ </a>
+ <a class="card kcard2 b-kpi" href="{% url 'bi:sales' %}">
+  <span class="lbl">Month to date</span><span class="num"><small>ZK</small>{{ kpi.mtd|floatformat:"0g" }}</span>
+  <span class="sub2">{% if kpi.mtd_vs is not None %}<span class="chip {% if kpi.mtd_vs >= 0 %}up{% else %}down{% endif %}">{{ kpi.mtd_vs|stringformat:"+d" }}%</span> vs same days last month{% endif %} · {{ kpi.mtd_orders }} orders</span>
+ </a>
+
+ <div class="card panel b-wide">
+  <div class="panel-head"><div><h3>Sales trend</h3><div class="bignum" id="trend-total">&nbsp;</div></div>
+   <div class="seg" role="group" aria-label="Range"><button type="button" data-n="7" aria-pressed="false">7 days</button><button type="button" data-n="14" aria-pressed="true">14 days</button></div></div>
+  <div id="c-days"></div>
+ </div>
+ <div class="b-side" style="display:grid;gap:16px;grid-auto-rows:min-content">
+  <a class="card kcard2" href="{% url 'bi:stock' %}"><span class="lbl">Stock value (cost)</span><span class="num"><small>ZK</small>{{ stock_value|floatformat:"0g" }}</span><span class="sub2">Open stock analysis</span></a>
+  <a class="card alertrow {% if owed %}plan{% endif %}" href="{% url 'pos:customers' %}"><b>ZK {{ owed|floatformat:"0g" }}</b><span>owed by customers</span></a>
+  <a class="card alertrow {% if reorder %}bad{% endif %}" href="{% url 'bi:insights' %}"><b>{{ reorder }}</b><span>product(s) to reorder</span></a>
+  {% if zra_on %}<a class="card alertrow {% if zra_failed %}bad{% elif zra_pending %}plan{% endif %}" href="{% url 'pos:report' %}"><b>{{ zra_pending }}</b><span>sales waiting for ZRA{% if zra_failed %}, {{ zra_failed }} failed{% endif %}</span></a>{% else %}<div class="card alertrow plan"><span>ZRA sending is switched off</span></div>{% endif %}
+  {% for p in peers %}<div class="card alertrow {% if 'OK' in p.last_result %}{% else %}bad{% endif %}"><b>{{ p.name }}</b><span>{% if p.last_run %}synced {{ p.last_run|timesince }} ago{% else %}never synced{% endif %}</span></div>{% endfor %}
+ </div>
+
+ <div class="card panel b-half"><div class="panel-head"><h3>Today by hour</h3></div><div id="c-hours"></div></div>
+ <div class="card panel b-half"><div class="panel-head"><h3>Paid today by</h3></div><div id="c-pays"></div>
+  <div class="panel-head" style="margin-top:18px"><h3>Tills open now</h3></div>
+  {% for t in tills %}<div class="till-row"><span>{{ t.s.cashier }}<br><small class="muted">since {{ t.s.opened_at|date:"H:i" }} · {{ t.n }} orders</small></span><b>{{ t.total|floatformat:0 }}</b></div>{% empty %}<p class="muted" style="margin:0">No open sessions.</p>{% endfor %}
+ </div>
+
+ <div class="card panel b-half"><div class="panel-head"><h3>Top products today</h3></div>
+  <ol class="rank" id="rank">{% for r in top %}<li data-v="{{ r.t|floatformat:'0' }}"><span class="n">{{ forloop.counter }}</span><span class="nm">{{ r.name }}</span><span class="v">{{ r.t|floatformat:"0g" }}</span><span class="meter"><i style="width:0"></i></span></li>{% empty %}<li class="muted">No sales yet today.</li>{% endfor %}</ol></div>
+ <div class="card panel b-half"><div class="panel-head"><h3>Worth a look</h3></div>
+  {% for f in flags %}<div class="flag">{{ f }}</div>{% empty %}<p class="muted" style="margin:0">Nothing flagged. Everything looks normal.</p>{% endfor %}
+  <div class="quick"><a class="btn" href="{% url 'bi:sales' %}">Sales analysis</a><a class="btn ghost" href="{% url 'bi:insights' %}">Insights &amp; ask your data</a><a class="btn ghost" href="{% url 'inventory:overview' %}">Inventory</a><a class="btn ghost" href="{% url 'pos:terminal' %}">Till</a></div>
+ </div>
 </div>
-<div class="grid2">
- <div class="card"><h3>Last 14 days</h3><div id="c-days"></div></div>
- <div class="card"><h3>Today by hour</h3><div id="c-hours"></div></div>
- <div class="card"><h3>Tills open now</h3><table class="t">{% for t in tills %}<tr><td>{{ t.s.cashier }}<br><small>since {{ t.s.opened_at|date:"H:i" }}</small></td><td class="r">{{ t.n }} orders</td><td class="r">{{ t.total|floatformat:2 }}</td></tr>{% empty %}<tr><td>No open sessions.</td></tr>{% endfor %}</table>
-  <h3>Paid today by</h3><div id="c-pays"></div></div>
- <div class="card"><h3>Top products today</h3><table class="t">{% for r in top %}<tr><td>{{ r.name }}</td><td class="r">{{ r.q|floatformat:"-0" }}</td><td class="r">{{ r.t|floatformat:2 }}</td></tr>{% empty %}<tr><td>No sales yet today.</td></tr>{% endfor %}</table>
-  <h3>Worth a look</h3>{% for f in flags %}<p style="margin:6px 0">• {{ f }}</p>{% empty %}<p>Nothing flagged.</p>{% endfor %}</div>
-</div>
-<p><a class="btn" href="{% url 'bi:sales' %}">Sales analysis</a> <a class="btn" href="{% url 'bi:insights' %}">Insights &amp; ask your data</a> <a class="btn" href="{% url 'inventory:overview' %}">Inventory</a> <a class="btn" href="{% url 'pos:terminal' %}">Till</a></p>
 {{ chart|json_script:"chartdata" }}
 <script>var D=JSON.parse(document.getElementById('chartdata').textContent);
-lineChart(document.getElementById('c-days'),D.days);barChart(document.getElementById('c-hours'),D.hours);donutChart(document.getElementById('c-pays'),D.pays);
-var tm=setTimeout(function(){location.reload()},60000);document.getElementById('rf').onclick=function(e){e.preventDefault();clearTimeout(tm);this.textContent='auto-refresh off'}</script>
+function days(n){var d=D.days.slice(-n);lineChart(document.getElementById('c-days'),d);var sum=d.reduce(function(a,p){return a+p[1]},0);document.getElementById('trend-total').innerHTML='ZK '+Math.round(sum).toLocaleString()+'<small>last '+d.length+' days</small>';}
+days(14);colChart(document.getElementById('c-hours'),D.hours);donutChart(document.getElementById('c-pays'),D.pays);
+sparkline(document.getElementById('spark-hero'),D.days.map(function(p){return p[1]}),'#fff');
+document.querySelectorAll('.seg button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.seg button').forEach(function(x){x.setAttribute('aria-pressed',x===b)});days(+b.dataset.n)}});
+var rk=[].slice.call(document.querySelectorAll('#rank li[data-v]')),mx=Math.max.apply(null,rk.map(function(l){return +l.dataset.v}))||1;
+rk.forEach(function(l){l.querySelector('.meter i').style.width=Math.max(6,Math.round(l.dataset.v/mx*100))+'%'});
+var tm=setTimeout(function(){location.reload()},60000),rf=document.getElementById('rf');rf.onclick=function(e){e.preventDefault();clearTimeout(tm);rf.classList.add('off');rf.querySelector('span').textContent='Auto-refresh off'}</script>
 {% endblock %}
