@@ -4,12 +4,30 @@
 {% block content %}
 {% include "launcher/topbar.html" %}
 <main class="home">
-  <div class="hero"><img src="{% static 'launcher/brand/logo-640.png' %}" alt="Alifaris Auto Spare"><p>Business suite</p></div>
+  <header class="welcome">
+    <img class="wlogo" src="{% static 'launcher/brand/logo-640.png' %}" alt="Alifaris Auto Spares">
+    <div>
+      <h1>Good {{ greeting }}, {{ who }}</h1>
+      <p>{{ today|date:"l, j F Y" }}</p>
+    </div>
+  </header>
   {% if notice %}
   <div class="notice" id="notice" role="status">
     <span>{{ notice }}</span>
     <button type="button" class="notice-x" id="notice-x" aria-label="Dismiss">&times;</button>
   </div>
+  {% endif %}
+  {% if pulse %}
+  <section class="pulse" aria-label="Today at a glance">
+    <a class="pcard hero-metric" href="{% url 'bi:dashboard' %}">
+      <span class="plabel">Sales today</span>
+      <b class="pnum"><small>ZK</small> {{ pulse.sales|floatformat:"0g" }}</b>
+      {% if pulse.delta is not None %}<span class="pdelta {% if pulse.delta >= 0 %}up{% else %}down{% endif %}">{{ pulse.delta|stringformat:"+d" }}% vs yesterday</span>{% else %}<span class="pdelta">First sales day on record</span>{% endif %}
+    </a>
+    <a class="pcard" href="{% url 'pos:order_list' %}"><span class="plabel">Orders today</span><b class="pnum">{{ pulse.orders }}</b></a>
+    <a class="pcard {% if pulse.low %}warn{% endif %}" href="{% url 'inventory:replenishment' %}"><span class="plabel">To reorder</span><b class="pnum">{{ pulse.low }}</b><span class="pnote">{% if pulse.low %}below minimum stock{% else %}all stocked{% endif %}</span></a>
+    <a class="pcard {% if pulse.owed %}warn{% endif %}" href="{% url 'pos:customers' %}"><span class="plabel">Owed by customers</span><b class="pnum"><small>ZK</small> {{ pulse.owed|floatformat:"0g" }}</b></a>
+  </section>
   {% endif %}
   <nav class="grid" aria-label="Applications">
     {% for t in tiles %}

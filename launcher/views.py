@@ -30,13 +30,48 @@ def _notice():
     return settings.HOME_NOTICE or None
 
 
+def _pulse(user):
+    """Four live numbers for managers on the home screen. Never blocks the page."""
+    if not user.is_staff:
+        return None
+    try:
+        from datetime import date, timedelta
+        from decimal import Decimal
+
+        from django.db.models import Count, Q, Sum
+
+        from inventory.services import stock
+        from pos import receivables
+        from pos.models import PosOrder
+
+        def day(d):
+            a = PosOrder.objects.filter(created_at__date=d).aggregate(t=Sum("total"), n=Count("id", filter=Q(kind="sale")))
+            return a["t"] or Decimal("0"), a["n"] or 0
+
+        today, n = day(date.today())
+        yest, _ = day(date.today() - timedelta(days=1))
+        return {
+            "sales": today, "orders": n,
+            "delta": round(float((today - yest) * 100 / yest)) if yest else None,
+            "low": len(stock.replenishment_candidates()), "owed": receivables.total_owed(),
+        }
+    except Exception:
+        return None
+
+
 @login_required
 def home(request):
+    from django.utils import timezone
+    now = timezone.localtime()
     ctx = {
         "tiles": modules.tiles(),
         "company": settings.COMPANY_NAME,
         "notice": _notice(),
         "unread": 2,
+        "pulse": _pulse(request.user),
+        "greeting": "morning" if now.hour < 12 else "afternoon" if now.hour < 17 else "evening",
+        "who": (request.user.get_short_name() or request.user.get_username()).title(),
+        "today": now,
     }
     return render(request, "launcher/home.html", ctx)
 
