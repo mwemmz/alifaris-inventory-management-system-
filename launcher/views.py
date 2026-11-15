@@ -59,6 +59,66 @@ def _pulse(user):
         return None
 
 
+def _alerts(user):
+    """What needs attention, as (level, text, url) rows. Same facts the home screen shows, one line each."""
+    out = []
+    try:
+        from datetime import timedelta
+
+        from django.urls import reverse
+        from django.utils import timezone
+
+        from inventory.models import ZraConfig, ZraLog
+        from inventory.permissions import can_manage_stock
+        from inventory.services import stock
+        from pos import receivables
+        from pos.models import PosOrder
+
+        if user.is_staff:
+            failed = ZraLog.objects.filter(status="error", date__gte=timezone.now() - timedelta(hours=24)).count()
+            if ZraConfig.get().enabled and failed:
+                out.append(("bad", f"{failed} ZRA request(s) failed in the last 24 hours", reverse("inventory:zra_logs")))
+            waiting = PosOrder.objects.filter(zra_status__in=["pending", "failed"]).count()
+            if waiting:
+                out.append(("plan", f"{waiting} sale(s) not yet sent to ZRA", reverse("pos:report")))
+        if can_manage_stock(user):
+            low = len(stock.replenishment_candidates())
+            if low:
+                out.append(("plan", f"{low} product(s) below their reorder minimum", reverse("inventory:replenishment")))
+        if user.is_staff:
+            owed = receivables.total_owed()
+            if owed:
+                out.append(("plan", f"Customers owe ZK {owed:,.0f}", reverse("pos:customers")))
+    except Exception:
+        pass  # the bell must never break a page
+    return out
+
+
+def _activity(user, limit=12):
+    """Recent changes from the audit log. Managers see everyone; other users see their own."""
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from inventory.models import AuditLog
+    qs = AuditLog.objects.all() if user.is_staff else AuditLog.objects.filter(user=user)
+    rows = []
+    for a in qs[:limit]:
+        who = a.username or "system"
+        text = f"{who}: {a.action.replace('_', ' ')}" + (f" {a.subject}" if a.subject else "")
+        rows.append({"text": text, "when": timezone.localtime(a.created_at).strftime("%d %b %H:%M")})
+    return rows, (reverse("inventory:audit") if user.is_staff else None)
+
+
+@login_required
+def notifications(request):
+    alerts = [{"level": l, "text": t, "url": u} for l, t, u in _alerts(request.user)]
+    try:
+        activity, more = _activity(request.user)
+    except Exception:
+        activity, more = [], None
+    return JsonResponse({"alerts": alerts, "activity": activity, "activity_url": more})
+
+
 @login_required
 def home(request):
     from django.utils import timezone
@@ -67,7 +127,7 @@ def home(request):
         "tiles": modules.tiles(),
         "company": settings.COMPANY_NAME,
         "notice": _notice(),
-        "unread": 2,
+        "unread": len(_alerts(request.user)),
         "pulse": _pulse(request.user),
         "greeting": "morning" if now.hour < 12 else "afternoon" if now.hour < 17 else "evening",
         "who": (request.user.get_short_name() or request.user.get_username()).title(),

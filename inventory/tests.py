@@ -681,3 +681,30 @@ class ReportPages(Base):
         r = self.client.post("/inventory/data/demo-reset/", follow=True)
         self.assertContains(r, "only available")
         self.assertTrue(self.p.__class__.objects.filter(pk=self.p.pk).exists())
+
+
+class NotificationsEndpoint(Base):
+    def test_login_required_then_alerts_and_activity(self):
+        from django.contrib.auth import get_user_model
+        from inventory.models import AuditLog
+        self.assertEqual(self.client.get("/notifications/").status_code, 302)
+        u = get_user_model().objects.create_user("mgr", password="x", is_staff=True)
+        AuditLog.objects.create(user=u, username="mgr", action="login", subject="mgr")
+        self.client.force_login(u)
+        d = self.client.get("/notifications/").json()
+        self.assertIn("mgr: login mgr", [r["text"] for r in d["activity"]])
+        self.assertEqual(d["activity_url"], "/inventory/audit/")
+        self.assertIsInstance(d["alerts"], list)
+
+    def test_non_staff_sees_only_own_activity(self):
+        from django.contrib.auth import get_user_model
+        from inventory.models import AuditLog
+        U = get_user_model()
+        a, b = U.objects.create_user("a", password="x"), U.objects.create_user("b", password="x")
+        AuditLog.objects.create(user=a, username="a", action="login")
+        AuditLog.objects.create(user=b, username="b", action="login")
+        self.client.force_login(a)
+        d = self.client.get("/notifications/").json()
+        self.assertTrue(all(r["text"].startswith(("a:", "system:")) for r in d["activity"]))
+        self.assertFalse(any(r["text"].startswith("b:") for r in d["activity"]))
+        self.assertIsNone(d["activity_url"])

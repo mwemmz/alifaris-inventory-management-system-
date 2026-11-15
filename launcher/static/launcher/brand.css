@@ -241,3 +241,22 @@ table.list td .pill{font-weight:600}
 .kpis a.card{text-decoration:none;color:inherit;transition:border-color .15s ease,box-shadow .15s ease}
 .kpis a.card:first-child{color:#fff}
 @media (hover:hover) and (pointer:fine){.kpis a.card:hover{border-color:var(--red);box-shadow:0 4px 16px rgba(16,24,40,.12)}.kpis a.card:first-child:hover{box-shadow:0 12px 32px rgba(212,32,44,.38)}}
+
+/* Alerts + Activity panels */
+.pop{position:relative;display:flex;align-items:center}
+.popmenu{position:absolute;right:0;top:38px;width:min(340px,calc(100vw - 24px));background:#fff;color:var(--char);border:1px solid var(--line);border-radius:var(--r-surface);box-shadow:0 10px 28px rgba(0,0,0,.22);z-index:30;padding:6px 0;text-align:left;transform-origin:top right;transition:opacity .14s var(--ease-out),transform .14s var(--ease-out)}
+.popmenu[hidden]{display:none}
+@starting-style{.popmenu{opacity:0;transform:translateY(-4px) scale(.98)}}
+.popmenu h3{margin:0;padding:8px 14px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.popmenu ul{list-style:none;margin:0;padding:0;max-height:min(60vh,380px);overflow:auto}
+.popmenu li{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;font-size:13.5px;line-height:1.35;border-top:1px solid var(--line)}
+.popmenu li.empty{color:var(--muted);justify-content:flex-start}
+.popmenu li a{color:inherit;text-decoration:none;flex:1;display:block;margin:-9px -14px;padding:9px 14px 9px 22px;position:relative}
+.popmenu li a::before{content:"";position:absolute;left:10px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--red)}
+.popmenu li a.lvl-plan::before{background:#c98a00}
+@media (hover:hover) and (pointer:fine){.popmenu li a:hover{background:var(--tint)}}
+.popmenu time{color:var(--muted);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.popmore{display:block;padding:9px 14px;border-top:1px solid var(--line);font-size:13px;color:var(--red-dark);font-weight:600}
+.popmore[hidden],.badge[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.popmenu{transition:none}}
+@media (max-width:640px){.pop{position:static}.popmenu{position:fixed;left:12px;right:12px;top:56px;width:auto}}

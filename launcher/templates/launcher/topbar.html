@@ -4,13 +4,19 @@
   </a>
   {% block topbar_extra %}{% endblock %}
   <div class="topbar-right">
-    <button class="icon-btn" type="button" title="Messages" aria-label="Messages">
-      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M20 8h1a1 1 0 0 1 1 1v9l-3-3h-6" fill="currentColor" opacity=".6"/></svg>
-      {% if unread %}<span class="badge">{{ unread }}</span>{% endif %}
-    </button>
-    <button class="icon-btn" type="button" title="Activities" aria-label="Activities">
-      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-    </button>
+    <div class="pop">
+      <button class="icon-btn" type="button" title="Alerts" aria-label="Alerts" aria-haspopup="true" aria-expanded="false" data-pop="alerts">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M20 8h1a1 1 0 0 1 1 1v9l-3-3h-6" fill="currentColor" opacity=".6"/></svg>
+        <span class="badge" id="alert-badge" {% if not unread %}hidden{% endif %}>{{ unread }}</span>
+      </button>
+      <div class="popmenu" id="pop-alerts" role="region" aria-label="Alerts" hidden><h3>Needs attention</h3><ul id="alert-list"><li class="empty">Loading…</li></ul></div>
+    </div>
+    <div class="pop">
+      <button class="icon-btn" type="button" title="Recent activity" aria-label="Recent activity" aria-haspopup="true" aria-expanded="false" data-pop="activity">
+        <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="popmenu" id="pop-activity" role="region" aria-label="Recent activity" hidden><h3>Recent activity</h3><ul id="activity-list"><li class="empty">Loading…</li></ul><a class="popmore" id="activity-more" href="#" hidden>See full audit log</a></div>
+    </div>
     <span class="company">{{ company }}</span>
     <div class="user">
       <button class="avatar" type="button" id="user-btn" aria-haspopup="true">{{ request.user.get_username|slice:":1"|upper }}</button>

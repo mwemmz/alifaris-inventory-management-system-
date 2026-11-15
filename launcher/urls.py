@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("notifications/", views.notifications, name="notifications"),
     path("app/<slug:slug>/", views.module, name="module"),
     path("manifest.webmanifest", views.manifest, name="manifest"),
     path("sw.js", views.service_worker, name="sw"),
