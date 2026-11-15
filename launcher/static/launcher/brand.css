@@ -1,7 +1,32 @@
-/* Alifaris Auto Spares brand layer: charcoal, logo red, logo grey. Loaded last so it wins. */
-:root{--red:#d4202c;--red-dark:#a8151f;--char:#24272b;--char-2:#16181b;--grey:#a5a7a6;--paper:#f2f3f3;--plum:#d4202c;--teal:#d4202c}
+/* Alifaris Auto Spares brand layer: charcoal, logo red, logo grey. Loaded last so it wins.
+   Design rules for this file (Operate-mode business UI, preserve-the-brand):
+   - One token set below. One accent (logo red). Neutrals are the charcoal/grey family.
+   - Shape: controls 6px, surfaces 8px, pills full. Data tables stay square-edged (sticky headers).
+   - Motion: transform/opacity only, ease-out, under 200ms. Nothing animates on the till (POS scan/pay path).
+   - Motion and hover effects are gated: prefers-reduced-motion and (hover:hover) and (pointer:fine). */
+:root{
+  --red:#d4202c;--red-dark:#a8151f;--char:#24272b;--char-2:#16181b;--grey:#a5a7a6;--paper:#f2f3f3;
+  --plum:#d4202c;--teal:#d4202c;                      /* legacy aliases used by launcher.css */
+  --ink:#212529;--muted:#5b5f64;--line:#dee2e6;--tint:#fbf1f1;
+  --ok-bg:#dcefe2;--ok-ink:#14532d;--warn-bg:#f6ecd0;--warn-ink:#6b4e00;--bad-bg:#fbe2e4;--bad-ink:#8c1620;
+  --r-ctl:6px;--r-surface:8px;--r-pill:999px;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --focus-ring:0 0 0 3px rgba(212,32,44,.3);
+}
+/* base */
+html{-webkit-text-size-adjust:100%}
+body{line-height:1.45;-webkit-font-smoothing:antialiased}
 body.inv,body.pos{background:var(--paper)}
+h1,h2,h3{text-wrap:balance}
+p{text-wrap:pretty}
+::selection{background:rgba(212,32,44,.2)}
+/* figures line up in columns and totals */
+table,.stats,.totals,.grand,.paysum,.tile b,.kcard,.kpis{font-variant-numeric:tabular-nums}
 .barlogo{height:32px;width:auto;border-radius:4px;margin:0 10px 0 4px;display:block}
+/* focus: visible, 3:1+ against white. Keyboard users get a ring on every control. */
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red);box-shadow:var(--focus-ring)}
+.invbar :focus-visible,.posbar :focus-visible{outline-color:#fff}
 /* bars */
 .invbar,.posbar{background:var(--char);border-bottom:3px solid var(--red);color:#fff}
 .invbar{height:50px}
@@ -9,33 +34,121 @@ body.inv,body.pos{background:var(--paper)}
 .invbar .brand,.posbar .brand{color:#fff;letter-spacing:.3px}
 .menus>a,.dd>button,.posbar nav a{color:#d9dbdd}
 .menus>a:hover,.dd>button:hover,.dd.open>button{background:rgba(255,255,255,.12);color:#fff}
+.menus>a,.dd>button{transition:background-color .12s ease,color .12s ease}
 .invbar .site{background:rgba(212,32,44,.22);color:#ffd9dc}
 .invbar .company,.invbar .icon-btn,.posbar .who{color:#d9dbdd}
-.dd-menu a:hover{background:#fbeeee}
+.dd-menu a:hover{background:var(--tint)}
+.dd-menu{border-radius:var(--r-surface)}
 .posbar nav a:hover{color:#fff;text-decoration:underline;text-decoration-color:var(--red);text-underline-offset:6px}
-/* buttons */
-.btn.primary,.btn{border-radius:5px}
-.btn.primary{background:var(--red);border-color:var(--red)}.btn.primary:hover{background:var(--red-dark)}
+/* buttons: one press behaviour everywhere */
+.btn{border-radius:var(--r-ctl);touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:transform .14s var(--ease-out),background-color .14s ease,border-color .14s ease,color .14s ease}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}.btn.primary:hover{background:var(--red-dark);border-color:var(--red-dark)}
 .btn.danger{background:var(--char);border-color:var(--char)}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed;transform:none}
 a{color:var(--red-dark)}
+/* surfaces */
+.card,.sheet,.stats.bar,.kcard{border-radius:var(--r-surface)}
+input,select,textarea{border-radius:var(--r-ctl)}
+.muted,.note,.card .sub,.stats span,.dd-menu h6,.field small{color:var(--muted)}
+.empty{padding:40px 16px;color:var(--muted)}
+/* status pills, shared by every module */
+.pill,.state{display:inline-block;padding:2px 10px;border-radius:var(--r-pill);font-size:12px;font-weight:600;background:#e9ecef;color:#343a40}
+.pill.ok,.state.done{background:var(--ok-bg);color:var(--ok-ink)}
+.pill.plan,.state.plan{background:var(--warn-bg);color:var(--warn-ink)}
+.pill.bad,.state.cancel{background:var(--bad-bg);color:var(--bad-ink)}
+/* flash messages: coloured edge so the type is not carried by tint alone */
+.msg{border-left:4px solid #5aa9b8}
+.msg.success{border-left-color:#2f9e5b}.msg.error{border-left-color:var(--red)}.msg.warning{border-left-color:#d19a1c}
+/* data tables: header stays visible while scrolling long lists */
+table.list th{position:sticky;top:50px;z-index:1}
+table.list tr.click:hover{background:var(--tint)}
+.t tr:hover td{background:#fafafa}
 /* launcher (app grid) */
-body.launcher{background:radial-gradient(900px 420px at 50% -80px,rgba(212,32,44,.32),transparent 70%),linear-gradient(165deg,#2c2f34 0%,#1b1d20 100%);color:#e9eaeb}
+body.launcher{background:radial-gradient(900px 420px at 50% -80px,rgba(212,32,44,.32),transparent 70%),linear-gradient(165deg,#2c2f34 0%,#1b1d20 100%);color:#e9eaeb;min-height:100vh;min-height:100dvh}
 .launcher .topbar-menu,.launcher .icon-btn,.launcher .company{color:#e9eaeb}
-.avatar{background:var(--red)!important}
+.avatar{background:var(--red)!important;border-radius:var(--r-ctl)}
 .launcher .tile{color:#e3e4e5}
-.launcher .tile-icon{box-shadow:0 2px 6px rgba(0,0,0,.45)}
-.launcher .tile:hover .tile-icon{box-shadow:0 8px 18px rgba(0,0,0,.55),0 0 0 2px var(--red)}
+.launcher .tile-icon{position:relative;box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform .15s var(--ease-out)}
+/* hover glow lives on a pseudo-element so only opacity animates */
+.launcher .tile-icon::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  box-shadow:0 8px 18px rgba(0,0,0,.55),0 0 0 2px var(--red);transition:opacity .15s ease-out}
+.launcher .tile:focus-visible .tile-icon::after{opacity:1}
+.launcher .tile:active .tile-icon{transform:scale(.96)}
 .hero{text-align:center;margin:6px auto 34px}
 .hero img{width:min(360px,80vw);height:auto;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
 .hero p{margin:12px 0 0;color:#a9acb0;font-size:13px;letter-spacing:2px;text-transform:uppercase}
-.notice{background:#3a2a2c;border-color:#5a3438;color:#f3d6d8}.notice-x{color:#f3d6d8}
+.notice{background:#3a2a2c;border-color:#5a3438;color:#f3d6d8;border-radius:var(--r-surface)}.notice-x{color:#f3d6d8}
+.user-menu{border-radius:var(--r-surface)}.user-menu button{border-radius:var(--r-ctl)}
 /* login */
 body.login{display:flex;align-items:center;justify-content:center}
-.login-box{margin:0 auto;max-width:380px;width:92vw;padding:0;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.login-box{margin:0 auto;max-width:380px;width:92vw;padding:0;overflow:hidden;border-radius:var(--r-surface);box-shadow:0 14px 40px rgba(0,0,0,.55)}
 .login-box .plate{background:var(--grey);padding:18px 18px 14px;border-bottom:4px solid var(--red)}.login-box .plate img{width:100%;display:block}
 .login-box form{padding:10px 26px 26px}
 .login-box h1{font-size:15px;color:var(--char);letter-spacing:1.5px;text-transform:uppercase;padding:18px 26px 4px;margin:0}
-.login-box .btn{width:100%;background:var(--red)}.login-box .btn:hover{background:var(--red-dark)}
-.login-box input:focus{outline:2px solid #e8a3a8;border-color:var(--red)}
+.login-box label{color:var(--muted)}
+.login-box .btn{width:100%;background:var(--red);padding:11px 18px}.login-box .btn:hover{background:var(--red-dark)}
+.login-box input:focus{outline:none;border-color:var(--red);box-shadow:var(--focus-ring)}
+/* Apps overview and roadmap pages (replaces inline styles) */
+.stub.wide{max-width:860px;text-align:left}
+.stub.wide h1,.stub.wide>p{text-align:center}
+.apps-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);font-size:14px}
+.apps-table th{text-align:left;padding:10px 12px;background:#f8f9fa;border-bottom:2px solid var(--line)}
+.apps-table td{padding:10px 12px;border-bottom:1px solid #eef0f2;vertical-align:top}
+.apps-table td:first-child{white-space:nowrap}
+.stub-actions{text-align:center;margin-top:24px}
 
-.sec{font-size:15px;margin:26px 0 8px;color:var(--char)}.muted{color:#6b6e72}
+.sec{font-size:15px;margin:26px 0 8px;color:var(--char)}.muted{color:var(--muted)}
+
+/* ---- layout fixes found in the screenshot pass ---- */
+/* Inventory bar: tighter items, company name yields first, fade hints that the menu scrolls */
+.menus>a,.dd>button{padding:6px 9px}
+.menus{padding-right:22px;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent)}
+@media(max-width:1500px){.invbar .company{display:none}}
+/* POS / Reports bar: brand on one line, links wrap to their own scrollable row on phones */
+.posbar .brand{white-space:nowrap}
+@media(max-width:800px){
+  .posbar{flex-wrap:wrap;gap:6px 12px}
+  .posbar nav{order:3;flex:0 0 100%;overflow-x:auto;white-space:nowrap;scrollbar-width:none;padding-bottom:2px}
+  .posbar .who{margin-left:auto}
+}
+/* Launcher grid: centred rows so a short last row is not stranded at the left */
+.launcher .grid{display:flex;flex-wrap:wrap;justify-content:center;gap:26px;max-width:560px}
+.launcher .tile{flex:0 0 120px}
+@media(max-width:560px){.launcher .grid{gap:22px 8px}.launcher .tile{flex-basis:calc(33.333% - 8px)}}
+@media(max-width:380px){.launcher .tile{flex-basis:calc(50% - 8px)}}
+
+/* ---- POS: tablet-friendly touch targets, instant (no motion on the till) ---- */
+body.pos .btn{min-height:44px}
+body.pos .row .ctl button{width:40px;height:40px}
+body.pos .tile:active{transform:scale(.97)}
+body.pos .tile{transition:border-color .12s ease}
+@supports (height:100dvh){#till{height:calc(100dvh - 110px)}}
+@media(max-width:800px){#till{height:auto}}
+
+/* ---- hover effects only where hover exists (touch fires false hovers on tap) ---- */
+@media (hover:hover) and (pointer:fine){
+  .launcher .tile:hover .tile-icon,.launcher .tile:focus-visible .tile-icon{transform:translateY(-2px)}
+  .launcher .tile:hover .tile-icon::after{opacity:1}
+  .kcard{transition:border-color .15s ease,box-shadow .15s ease}
+}
+
+/* ---- motion: occasional surfaces only, enter-only, ease-out, under 200ms ---- */
+.dd.open .dd-menu,.user-menu,.msg{transition:opacity .14s var(--ease-out)}
+@starting-style{.dd.open .dd-menu,.user-menu,.msg{opacity:0}}
+@media (prefers-reduced-motion:no-preference){
+  .dd.open .dd-menu{transition:opacity .14s var(--ease-out),transform .14s var(--ease-out);transform-origin:top left}
+  .user-menu{transition:opacity .14s var(--ease-out),transform .14s var(--ease-out);transform-origin:top right}
+  .msg{transition:opacity .2s var(--ease-out),transform .2s var(--ease-out)}
+  @starting-style{
+    .dd.open .dd-menu{transform:translateY(-4px) scale(.98)}
+    .user-menu{transform:translateY(-4px) scale(.98)}
+    .msg{transform:translateY(-4px)}
+  }
+}
+/* reduced motion keeps the opacity fades above and drops position/scale changes */
+@media (prefers-reduced-motion:reduce){
+  .btn:active,.launcher .tile:active .tile-icon,body.pos .tile:active{transform:none}
+  .launcher .tile:hover .tile-icon{transform:none}
+}
