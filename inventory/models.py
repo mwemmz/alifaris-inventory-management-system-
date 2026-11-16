@@ -93,6 +93,9 @@ class Product(models.Model):
 
     @property
     def on_hand(self):
+        cached = getattr(self, "_oh", None)  # set in bulk by stock.with_on_hand(); saves one query per product
+        if cached is not None:
+            return cached
         total = self.quants.filter(location__usage=Location.INTERNAL).aggregate(t=Sum("qty"))["t"]
         return Decimal(total or 0).quantize(Decimal("0.001"))
 

@@ -158,9 +158,24 @@ def apply_landed_cost(lc):
     lc.save(update_fields=["applied"])
 
 
+def on_hand_map():
+    """{product_id: on-hand qty} for every product in ONE query (internal locations only)."""
+    rows = (StockQuant.objects.filter(location__usage=Location.INTERNAL).values("product").annotate(t=Sum("qty")))
+    return {r["product"]: Decimal(r["t"] or 0).quantize(Decimal("0.001")) for r in rows}
+
+
+def with_on_hand(products):
+    """List of products with .on_hand pre-filled from one query, instead of one query per product."""
+    m, out = on_hand_map(), list(products)
+    zero = Decimal("0.000")
+    for p in out:
+        p._oh = m.get(p.pk, zero)
+    return out
+
+
 def stock_valuation():
     rows = []
-    for p in Product.objects.filter(product_type=Product.GOODS, active=True):
+    for p in with_on_hand(Product.objects.filter(product_type=Product.GOODS, active=True).select_related("category")):
         qty = p.on_hand
         if qty:
             rows.append({"product": p, "qty": qty, "cost": p.cost, "value": qty * p.cost})
@@ -169,7 +184,7 @@ def stock_valuation():
 
 def replenishment_candidates():
     out = []
-    for p in Product.objects.filter(product_type=Product.GOODS, active=True, min_qty__gt=0):
+    for p in with_on_hand(Product.objects.filter(product_type=Product.GOODS, active=True, min_qty__gt=0).select_related("category")):
         oh = p.on_hand
         if oh < p.min_qty:
             target = p.max_qty if p.max_qty > p.min_qty else p.min_qty

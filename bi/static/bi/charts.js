@@ -93,17 +93,17 @@
     rows = rows.filter(function (r) { return r[1] > 0; });
     var total = rows.reduce(function (a, r) { return a + r[1]; }, 0);
     if (!total) { box.textContent = 'No data'; return; }
-    var s = svg(box, 380, 190), R = 78, r = 54, cx = 92, cy = 95, a0 = -Math.PI / 2, gap = rows.length > 1 ? 0.045 : 0;
+    var W = 460, n = rows.length, H = Math.max(190, 36 + n * 28), s = svg(box, W, H), R = 78, r = 54, cx = 92, cy = H / 2, a0 = -Math.PI / 2, gap = rows.length > 1 ? 0.045 : 0;
     var c = function (a, rad) { return (cx + rad * Math.cos(a)) + ' ' + (cy + rad * Math.sin(a)); };
     rows.forEach(function (row, i) {
       var sweep = row[1] / total * Math.PI * 2, A0 = a0 + gap / 2, A1 = a0 + sweep - gap / 2; if (rows.length === 1) A1 = a0 + Math.PI * 2 - 0.001;
       var big = A1 - A0 > Math.PI ? 1 : 0, col = COLORS[i % COLORS.length];
       var p = el('path', {d: 'M' + c(A0, R) + ' A' + R + ' ' + R + ' 0 ' + big + ' 1 ' + c(A1, R) + ' L' + c(A1, r) + ' A' + r + ' ' + r + ' 0 ' + big + ' 0 ' + c(A0, r) + 'Z', fill: col, 'stroke-linejoin': 'round'}, s);
       el('title', {}, p).textContent = row[0] + ': ZK ' + full(row[1]) + ' (' + Math.round(row[1] / total * 100) + '%)';
-      var y0 = 40 + i * 30;
+      var y0 = (H - n * 28) / 2 + 19 + i * 28;
       el('circle', {cx: 196, cy: y0 - 4, r: 5, fill: col}, s);
-      el('text', {x: 210, y: y0, 'font-size': 13, fill: INK}, s).textContent = (row[0] || '').slice(0, 14);
-      el('text', {x: 372, y: y0, 'text-anchor': 'end', 'font-size': 13, 'font-weight': 700, fill: INK}, s).textContent = Math.round(row[1] / total * 100) + '%';
+      el('text', {x: 210, y: y0, 'font-size': 13, fill: INK}, s).textContent = (row[0] || '').slice(0, 22);
+      el('text', {x: W - 8, y: y0, 'text-anchor': 'end', 'font-size': 13, 'font-weight': 700, fill: INK}, s).textContent = Math.round(row[1] / total * 100) + '%';
       a0 += sweep;
     });
     el('text', {x: cx, y: cy - 2, 'text-anchor': 'middle', 'font-size': 10.5, fill: MUTED, 'letter-spacing': '.08em'}, s).textContent = 'TOTAL';

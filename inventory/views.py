@@ -157,12 +157,12 @@ def warehouse(request):
     """One screen for the warehouse manager: what is waiting, what is low, where the stock sits, what moved."""
     waiting = []
     for slug, code in OPS.items():
-        qs = Picking.objects.filter(op_type__code=code, state=Picking.DRAFT).select_related("source", "dest").order_by("-id")
+        qs = Picking.objects.filter(op_type__code=code, state=Picking.DRAFT).select_related("source__warehouse", "dest__warehouse").order_by("-id")
         waiting.append({"title": OP_TITLES[slug], "slug": slug, "count": qs.count(), "recent": list(qs[:5])})
     low = sorted(stock.replenishment_candidates(), key=lambda r: r["on_hand"] - r["min"])
     by_location = (StockQuant.objects.filter(location__usage=Location.INTERNAL, qty__gt=0)
                    .values("location__name").annotate(items=Count("product"), units=Sum("qty")).order_by("-units"))
-    moves = StockMove.objects.select_related("product", "source", "dest", "picking__op_type")[:15]
+    moves = StockMove.objects.select_related("product", "source__warehouse", "dest__warehouse", "picking__op_type")[:15]
     return render(request, "inventory/warehouse.html", ctx(
         request, waiting=waiting, low=low[:12], low_total=len(low), by_location=by_location, moves=moves,
         out_of_stock=sum(1 for r in low if r["on_hand"] <= 0), products=Product.objects.filter(active=True).count()))
@@ -173,7 +173,7 @@ def warehouse(request):
 def picking_list(request, kind):
     if kind not in OPS:
         raise Http404
-    qs = Picking.objects.filter(op_type__code=OPS[kind]).select_related("partner", "source", "dest")
+    qs = Picking.objects.filter(op_type__code=OPS[kind]).select_related("partner", "source__warehouse", "dest__warehouse")
     if s := request.GET.get("state"):
         qs = qs.filter(state=s)
     if q := request.GET.get("q"):

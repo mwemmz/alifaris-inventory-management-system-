@@ -1,5 +1,5 @@
 // Alifaris ERP service worker: keeps the app shell and pages you have already opened available offline.
-const VERSION = 'alifaris-v13';
+const VERSION = 'alifaris-v14';
 const OFFLINE = '/offline/';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll([OFFLINE])).then(() => self.skipWaiting()));

@@ -708,3 +708,24 @@ class NotificationsEndpoint(Base):
         self.assertTrue(all(r["text"].startswith(("a:", "system:")) for r in d["activity"]))
         self.assertFalse(any(r["text"].startswith("b:") for r in d["activity"]))
         self.assertIsNone(d["activity_url"])
+
+
+class QueryBudget(Base):
+    """Guards the N+1 fix: stock figures for many products must come from one query, not one each."""
+    def test_on_hand_for_many_products_is_one_query(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from inventory.models import Product
+        from inventory.services import stock
+        for i in range(12):
+            Product.objects.create(name=f"P{i}", internal_ref=f"QB-{i}", price=1, cost=1, min_qty=5)
+        with CaptureQueriesContext(connection) as q:
+            rows = stock.replenishment_candidates()
+        self.assertGreaterEqual(len(rows), 12)
+        self.assertLessEqual(len(q), 3)
+
+    def test_bulk_on_hand_matches_single(self):
+        from inventory.models import Product
+        from inventory.services import stock
+        p = Product.objects.create(name="Same", internal_ref="QB-S", price=1, cost=1)
+        self.assertEqual(stock.with_on_hand([p])[0].on_hand, Product.objects.get(pk=p.pk).on_hand)

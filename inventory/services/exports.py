@@ -17,7 +17,7 @@ def _num(v):
 def products():
     rows = [[p.internal_ref, p.barcode, p.name, p.category.name if p.category else "", p.price, p.secondary_price, p.cost,
              p.on_hand, p.min_qty, p.max_qty, p.tax_type, "yes" if p.active else "no"]
-            for p in Product.objects.select_related("category").order_by("name")]
+            for p in stock.with_on_hand(Product.objects.select_related("category").order_by("name"))]
     return "Products", ["Ref", "Barcode", "Name", "Category", "Price", "Secondary price", "Avg cost", "On hand",
                         "Min", "Max", "Tax", "Active"], rows
 

@@ -13,6 +13,7 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from inventory.models import Product
+from inventory.services import stock
 from pos.models import PosOrder, PosOrderLine, PosSession
 
 LOOKBACK = 30
@@ -25,8 +26,10 @@ def reorder_suggestions(lookback=LOOKBACK, lead=LEAD_DAYS, target=TARGET_DAYS):
     sold = (PosOrderLine.objects.filter(order__created_at__gte=since).values("product")
             .annotate(q=Sum("qty")).filter(q__gt=0))
     out = []
+    sold = list(sold)
+    prods = {p.pk: p for p in stock.with_on_hand(Product.objects.filter(pk__in=[r["product"] for r in sold], active=True))}
     for row in sold:
-        p = Product.objects.filter(pk=row["product"], active=True).first()
+        p = prods.get(row["product"])
         if not p or not p.tracks_stock:
             continue
         per_day = row["q"] / Decimal(lookback)
@@ -44,7 +47,7 @@ def dead_stock(days=60, limit=30):
     since = timezone.now() - timedelta(days=days)
     moving = set(PosOrderLine.objects.filter(order__created_at__gte=since).values_list("product", flat=True))
     rows = []
-    for p in Product.objects.filter(active=True).exclude(pk__in=moving).select_related("category")[:2000]:
+    for p in stock.with_on_hand(Product.objects.filter(active=True).exclude(pk__in=moving).select_related("category")[:2000]):
         if p.tracks_stock and p.on_hand > 0 and p.cost > 0:
             rows.append({"p": p, "on_hand": p.on_hand, "value": p.on_hand * p.cost})
     rows.sort(key=lambda r: -r["value"])

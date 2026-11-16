@@ -123,7 +123,8 @@ def answer(question):
         if cat:
             qs = qs.filter(category=cat)
         cost_v = retail_v = Decimal(0)
-        for p in qs:
+        from inventory.services.stock import with_on_hand
+        for p in with_on_hand(qs):
             if p.tracks_stock and p.on_hand > 0:
                 cost_v += p.on_hand * p.cost
                 retail_v += p.on_hand * p.price

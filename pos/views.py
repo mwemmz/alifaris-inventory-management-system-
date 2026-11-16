@@ -64,7 +64,8 @@ def terminal(request):
 def catalog(request):
     """Whole price list for the till to keep on the device, so it keeps working when the network drops."""
     rows = []
-    for p in Product.objects.filter(active=True).select_related("uom"):
+    from inventory.services.stock import with_on_hand
+    for p in with_on_hand(Product.objects.filter(active=True).select_related("uom")):
         rows.append({"id": p.pk, "ref": p.internal_ref, "name": p.name, "barcode": p.barcode or "",
                      "price": str(p.price), "price2": str(p.secondary_price or ""), "tax": p.tax_type,
                      "stock": str(p.on_hand) if p.tracks_stock else None, "image": p.image.url if p.image else ""})

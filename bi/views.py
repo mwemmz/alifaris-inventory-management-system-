@@ -143,7 +143,7 @@ def stock_view(request):
     if (hi := _dec(g.get("max_price"))) is not None:
         qs = qs.filter(price__lte=hi)
     rows, cats = [], {}
-    for p in qs:
+    for p in stock.with_on_hand(qs):
         if not p.tracks_stock:
             continue
         oh = p.on_hand
@@ -275,7 +275,7 @@ def dashboard(request):
     zra_on = ZraConfig.get().enabled
     mine = PosOrder.objects.filter(remote=False)
     value = ZERO
-    for p in Product.objects.filter(active=True):
+    for p in stock.with_on_hand(Product.objects.filter(active=True)):
         if p.tracks_stock:
             oh = p.on_hand
             if oh > 0:

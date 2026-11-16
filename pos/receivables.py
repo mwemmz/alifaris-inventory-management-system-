@@ -94,7 +94,11 @@ def summary(now=None):
 
 
 def total_owed():
-    return sum((r["balance"] for r in summary()), ZERO)
+    """Total credit sold minus total paid, in two queries (same figure as adding up every customer's balance)."""
+    sold = (PosPayment.objects.filter(method=PosPayment.CREDIT, order__customer__isnull=False)
+            .aggregate(t=Sum("amount"))["t"] or ZERO)
+    paid = CustomerPayment.objects.aggregate(t=Sum("amount"))["t"] or ZERO
+    return sold - paid
 
 
 def record_payment(customer, amount, method, user, reference="", note="", paid_at=None):
