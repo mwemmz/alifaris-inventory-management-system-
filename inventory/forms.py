@@ -85,7 +85,7 @@ CRUD = {
 }
 
 
-ROLES = [("manager", "Manager (everything)"), ("warehouse", "Warehouse Manager"), ("storekeeper", "Storekeeper"),
+ROLES = [("manager", "Manager (everything)"), ("warehouse", "Warehouse Manager"), ("storekeeper", "Sales Manager"),
          ("cashier", "Cashier"), ("viewer", "View only")]
 ROLE_GROUPS = {"warehouse": "Warehouse Manager", "storekeeper": "Storekeeper", "cashier": "Cashier"}
 

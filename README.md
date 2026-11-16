@@ -73,7 +73,7 @@ Stock quantities are never copied directly; they are always rebuilt from moves.
 
 - **Staff users** (managers): everything, including Configuration, Import and ZRA settings.
 - **Warehouse Manager group** (created by `seed_inventory`): everything a storekeeper can do, plus the **Warehouse** screen (drafts waiting, low stock, stock by location, latest movements), warehouses, locations, categories, units and contacts, product import, the Stock and Insights reports and reorder drafts. Not sales reports, ZRA settings, API tokens, site sync or user admin.
-- **Storekeeper group** (created by `seed_inventory`): record receipts, deliveries, transfers, counts, scrap and edit products.
+- **Sales Manager role (the "Storekeeper" group)** (created by `seed_inventory`): record receipts, deliveries, transfers, counts, scrap and edit products.
 - **Any other logged-in user**: view only.
 
 ## Credit sales and customer statements (`/pos/customers/`)
@@ -86,7 +86,7 @@ Each sale line keeps the product's average cost at the moment of sale, so margin
 
 ## Users, audit log, purchasing, backups
 
-- **Users and roles** (Configuration, managers only): create users, set Manager / Warehouse Manager / Storekeeper / Cashier / View only, deactivate, reset passwords. The last active manager cannot be demoted or deactivated.
+- **Users and roles** (Configuration, managers only): create users, set Manager / Warehouse Manager / Sales Manager / Cashier / View only, deactivate, reset passwords. The last active manager cannot be demoted or deactivated.
 - **Audit log** (managers only): who changed prices, products, users, settings, validated stock, cancelled documents, refunded or took payments, downloaded backups or exports, plus failed logins, with time and IP.
 - **Purchase orders** (Operations, Procurement): draft, mark as ordered, **Receive goods** (creates the draft receipt for the supplier; validating that receipt adds the stock, updates average cost and closes the order). Replenishment can draft an order for everything below its minimum. Suppliers are contacts with Supplier ticked.
 - **Backup and exports** (Configuration, Data): managers download a consistent copy of the database and Excel files for products, valuation, movements, purchase orders, sales with profit and customers who owe. For automatic backups schedule `python manage.py backup_db --to backups --keep 14`. Keep copies off the machine; restoring means replacing the database file.
@@ -111,7 +111,7 @@ Move to PostgreSQL if one server will carry several busy shops. Put the site beh
 `render.yaml` is a Blueprint for Render: **New > Blueprint**, pick this repository, apply. It builds with `build.sh`,
 starts with `start.sh` (migrate, `seed_inventory`, then `seed_demo` when `ALIFARIS_DEMO=1`) and checks `/healthz`.
 
-- **Logins:** `manager`, `warehouse` (Warehouse Manager), `keeper` (Storekeeper), `cashier1`, `cashier2`. Render generates
+- **Logins:** `manager`, `warehouse` (Warehouse Manager), `salesmanager` (Sales Manager), `cashier1`, `cashier2`. Render generates
   the shared password: open the service, **Environment**, `ALIFARIS_DEMO_PASSWORD`.
 - **Demo data** is made up: 42 auto parts in kwacha and 30 days of sales, refunds, cash-ups and a stock count, so the
   dashboards, reorder suggestions and warehouse screen have something to show. It never runs on a database that already has products

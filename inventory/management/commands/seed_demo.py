@@ -80,7 +80,7 @@ SUPPLIERS = ["Copperbelt Auto Wholesale (demo)", "Lusaka Parts Importers (demo)"
 CUSTOMERS = [("Kabwe Haulage (demo)", "1000000001"), ("Mwami Taxi Co-op (demo)", "1000000002"),
              ("Chilanga Garage (demo)", "1000000003"), ("Zambezi Logistics (demo)", "1000000004")]
 USERS = [  # username, role
-    ("manager", "manager"), ("warehouse", "warehouse"), ("keeper", "storekeeper"),
+    ("manager", "manager"), ("warehouse", "warehouse"), ("salesmanager", "storekeeper"),
     ("cashier1", "cashier"), ("cashier2", "cashier"),
 ]
 
@@ -248,7 +248,7 @@ class Command(BaseCommand):
         stock.validate_picking(sent)
         StockMove.objects.filter(picking=sent).update(date=timezone.now() - timedelta(days=2))
         stock.new_picking(internal, [(p, max(Decimal(10), q / 10)) for p, q in reserve[6:10]], source=store, dest=shelf,
-                          origin="Refill requested by the shop", user=users["keeper"] if "keeper" in users else users["warehouse"])
+                          origin="Refill requested by the shop", user=users["salesmanager"] if "salesmanager" in users else users["warehouse"])
         return 2
 
     @staticmethod

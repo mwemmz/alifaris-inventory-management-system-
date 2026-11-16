@@ -32,7 +32,7 @@ def can_edit(user):
 
 
 def deny(request):
-    messages.error(request, "Your account can view stock but not change it. Ask a manager to add you to the Storekeeper or Warehouse Manager group.")
+    messages.error(request, "Your account can view stock but not change it. Ask a manager to add you to the Sales Manager or Warehouse Manager role.")
     return redirect("inventory:overview")
 
 
