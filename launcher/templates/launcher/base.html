@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{% static 'launcher/brand/favicon.png' %}">
   <link rel="manifest" href="{% url 'manifest' %}">
-  <meta name="theme-color" content="#24272b">
+  <meta name="theme-color" content="#0a0b0d">
+  <script>(function(){var t="dark";try{var s=localStorage.getItem("alifaris-theme");if(s==="light"||s==="dark")t=s;}catch(e){}document.documentElement.setAttribute("data-theme",t);})();</script>
   <link rel="apple-touch-icon" href="{% static 'launcher/icons/icon-192.png' %}">
   <title>{% block title %}Alifaris ERP{% endblock %}</title>
   <link rel="preload" href="{% static 'launcher/fonts/geist-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>

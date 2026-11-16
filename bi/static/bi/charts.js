@@ -3,7 +3,9 @@
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
   var COLORS = ['#e0303c', '#ff8a4c', '#f5b942', '#8d939b', '#3ddc97', '#c3c7cc', '#b81a26', '#6e747c'];
-  var INK = '#eceef0', MUTED = '#8d939b', GRID = 'rgba(255,255,255,.07)', uid = 0;
+  var INK = '#eceef0', MUTED = '#8d939b', GRID = 'rgba(255,255,255,.07)', TRACK = 'rgba(255,255,255,.05)', uid = 0;
+  function theme() { var s = getComputedStyle(document.documentElement), v = function (n, d) { return (s.getPropertyValue(n) || '').trim() || d; }; INK = v('--ink', INK); MUTED = v('--muted', MUTED); GRID = v('--grid', GRID); TRACK = v('--wash', TRACK); }
+  theme();
   function el(n, a, parent) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (parent) parent.appendChild(e); return e; }
   function fmt(n) { return Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.abs(n) >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k' : Math.round(n); }
   function full(n) { return Math.round(n).toLocaleString(); }
@@ -50,7 +52,7 @@
     var step = Math.ceil(all.length / 7);
     all.forEach(function (p, i) { if (i % step === 0) el('text', {x: x(i), y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: MUTED}, s).textContent = p[0].slice(5); });
     // crosshair
-    var vl = el('line', {y1: T, y2: base, stroke: 'rgba(255,255,255,.25)', 'stroke-dasharray': '3 4', opacity: 0}, s);
+    var vl = el('line', {y1: T, y2: base, stroke: MUTED, 'stroke-dasharray': '3 4', opacity: 0}, s);
     var halo = el('circle', {r: 9, fill: 'rgba(255,90,102,.25)', opacity: 0}, s), dot = el('circle', {r: 4.5, fill: '#fff', stroke: '#e0303c', 'stroke-width': 2.5, opacity: 0}, s);
     var last = points.length - 1; // resting marker on the latest point
     halo.setAttribute('cx', x(last)); halo.setAttribute('cy', y(points[last][1])); dot.setAttribute('cx', x(last)); dot.setAttribute('cy', y(points[last][1])); halo.setAttribute('opacity', 1); dot.setAttribute('opacity', 1);
@@ -105,7 +107,7 @@
       a0 += sweep;
     });
     el('text', {x: cx, y: cy - 2, 'text-anchor': 'middle', 'font-size': 10.5, fill: MUTED, 'letter-spacing': '.08em'}, s).textContent = 'TOTAL';
-    el('text', {x: cx, y: cy + 17, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 700, fill: '#fff'}, s).textContent = fmt(total);
+    el('text', {x: cx, y: cy + 17, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 700, fill: INK}, s).textContent = fmt(total);
   };
 
   window.barChart = function (box, rows) {
@@ -115,7 +117,7 @@
     rows.forEach(function (r, i) {
       var w = (W - 270) * r[1] / max;
       el('text', {x: 0, y: i * rowH + 19, 'font-size': 12.5, fill: INK}, s).textContent = (r[0] || '').slice(0, 30);
-      el('rect', {x: 210, y: i * rowH + 7, width: W - 270, height: 14, rx: 7, fill: 'rgba(255,255,255,.05)'}, s);
+      el('rect', {x: 210, y: i * rowH + 7, width: W - 270, height: 14, rx: 7, fill: TRACK}, s);
       var b = el('rect', {x: 210, y: i * rowH + 7, width: Math.max(w, 6), height: 14, rx: 7, fill: 'url(#' + id + ')'}, s);
       el('title', {}, b).textContent = r[0] + ': ' + full(r[1]);
       el('text', {x: 216 + Math.max(w, 6) + 4, y: i * rowH + 19, 'font-size': 12, fill: MUTED}, s).textContent = fmt(r[1]);
@@ -133,4 +135,12 @@
     el('path', {d: d + ' L' + W + ' ' + H + ' L0 ' + H + 'Z', fill: 'url(#' + id + ')'}, s);
     el('path', {d: d, fill: 'none', stroke: color || '#fff', 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round', opacity: .9}, s);
   };
+
+  // remember every chart so it can be redrawn with the new colours when the theme flips
+  var reg = [];
+  ['lineChart', 'colChart', 'donutChart', 'barChart', 'sparkline'].forEach(function (n) {
+    var f = window[n];
+    window[n] = function (box) { var a = arguments; reg = reg.filter(function (r) { return r.box !== box; }); reg.push({f: f, box: box, a: a}); theme(); return f.apply(null, a); };
+  });
+  window.addEventListener('themechange', function () { theme(); reg.forEach(function (r) { if (document.body.contains(r.box)) r.f.apply(null, r.a); }); });
 })();
