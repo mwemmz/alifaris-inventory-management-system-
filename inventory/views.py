@@ -1,3 +1,4 @@
+from functools import wraps
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -17,8 +18,23 @@ from .permissions import (WM_CONFIG_KEYS, can_edit, can_manage_stock, editor_req
                           post_needs_editor)
 from .services.stock import StockError
 
-staff_required = user_passes_test(lambda u: u.is_active and u.is_staff, login_url="login")
-stock_manager_required = user_passes_test(can_manage_stock, login_url="login")
+def _gate(test, what):
+    """Login page for strangers; a clear message and the overview for signed-in people whose role cannot open the page."""
+    def deco(view):
+        @wraps(view)
+        def wrapper(request, *a, **kw):
+            if not request.user.is_authenticated:
+                return redirect(f"/login/?next={request.path}")
+            if not test(request.user):
+                messages.error(request, f"Your role cannot open that page. It is for {what}.")
+                return redirect("inventory:overview")
+            return view(request, *a, **kw)
+        return wrapper
+    return deco
+
+
+staff_required = _gate(lambda u: u.is_active and u.is_staff, "managers")
+stock_manager_required = _gate(can_manage_stock, "managers and warehouse managers")
 
 OPS = {"receipts": OperationType.RECEIPT, "deliveries": OperationType.DELIVERY, "internal": OperationType.INTERNAL}
 OP_TITLES = {"receipts": "Receipts", "deliveries": "Deliveries", "internal": "Internal Transfers"}

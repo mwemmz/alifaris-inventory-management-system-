@@ -119,12 +119,21 @@ def notifications(request):
     return JsonResponse({"alerts": alerts, "activity": activity, "activity_url": more})
 
 
+def _tiles_for(user):
+    """Only tiles this person can open, so nobody taps a tile and is bounced back."""
+    from pos.services import can_sell
+    from inventory.permissions import can_manage_stock
+    rules = {"dashboards": user.is_staff, "point-of-sale": can_sell(user), "sales": can_sell(user),
+             "contacts": can_manage_stock(user), "purchase": can_manage_stock(user)}
+    return [t for t in modules.tiles() if rules.get(t["slug"], True)]
+
+
 @login_required
 def home(request):
     from django.utils import timezone
     now = timezone.localtime()
     ctx = {
-        "tiles": modules.tiles(),
+        "tiles": _tiles_for(request.user),
         "company": settings.COMPANY_NAME,
         "notice": _notice(),
         "unread": len(_alerts(request.user)),

@@ -748,3 +748,21 @@ class ProductPage(Base):
         r = self.client.get(f"/inventory/products/{self.p.pk}/")
         self.assertEqual(r.status_code, 200)
         self.assertNotContains(r, "Edit product")
+
+
+class RoleBounce(Base):
+    def test_blocked_page_explains_instead_of_login_loop(self):
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("view1", password="x")
+        self.client.force_login(u)
+        r = self.client.get("/inventory/config/partners/", follow=True)
+        self.assertNotIn("/login/", r.redirect_chain[-1][0])
+        self.assertContains(r, "Your role cannot open that page")
+
+    def test_home_hides_tiles_the_role_cannot_open(self):
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("view2", password="x")
+        self.client.force_login(u)
+        r = self.client.get("/")
+        self.assertNotContains(r, 'href="/bi/"')
+        self.assertNotContains(r, 'href="/pos/"')

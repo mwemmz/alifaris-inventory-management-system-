@@ -11,6 +11,7 @@
       <p>{{ today|date:"l, j F Y" }}</p>
     </div>
   </header>
+  {% for m in messages %}<div class="notice" role="alert"><span>{{ m }}</span></div>{% endfor %}
   {% if notice %}
   <div class="notice" id="notice" role="status">
     <span>{{ notice }}</span>

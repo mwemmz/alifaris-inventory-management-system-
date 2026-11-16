@@ -58,6 +58,7 @@ def _category_ids(cid):
 @login_required
 def sales(request):
     if not request.user.is_staff:
+        messages.error(request, "Dashboards are for managers.")
         return redirect("/")
     g = request.GET
     today = date.today()
@@ -131,6 +132,7 @@ def sales(request):
 @login_required
 def stock_view(request):
     if not can_manage_stock(request.user):
+        messages.error(request, "Dashboards are for managers.")
         return redirect("/")
     g = request.GET
     qs = Product.objects.filter(active=True).select_related("category")
@@ -176,6 +178,7 @@ def stock_view(request):
 @login_required
 def insights_view(request):
     if not can_manage_stock(request.user):
+        messages.error(request, "Dashboards are for managers.")
         return redirect("/")
     hist, future = insights.forecast()
     return render(request, "bi/insights.html", {
@@ -215,6 +218,7 @@ def ask_view(request):
 def draft_order(request):
     """Turn the reorder suggestions into one DRAFT receipt. Nothing moves until someone validates it."""
     if not can_manage_stock(request.user):
+        messages.error(request, "Dashboards are for managers.")
         return redirect("/")
     from inventory.services import stock
     chosen = set(request.POST.getlist("pick"))
@@ -237,6 +241,7 @@ def _pct(now, before):
 @login_required
 def dashboard(request):
     if not request.user.is_staff:
+        messages.error(request, "Dashboards are for managers.")
         return redirect("/")
     from datetime import datetime
     from django.db.models.functions import ExtractHour
