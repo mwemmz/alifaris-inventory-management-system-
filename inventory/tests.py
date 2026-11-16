@@ -216,7 +216,7 @@ class Screens(Base):
 
     def test_every_screen_renders(self):
         urls = ["/", "/inventory/", "/inventory/products/", "/inventory/products/?view=list", "/inventory/products/new/",
-                f"/inventory/products/{self.p.pk}/", "/inventory/operations/receipts/", "/inventory/operations/deliveries/",
+                f"/inventory/products/{self.p.pk}/", f"/inventory/products/{self.p.pk}/edit/", "/inventory/operations/receipts/", "/inventory/operations/deliveries/",
                 "/inventory/operations/internal/", "/inventory/operations/receipts/new/", "/inventory/physical-inventory/",
                 "/inventory/scrap/", "/inventory/scrap/new/", "/inventory/landed-costs/", "/inventory/landed-costs/new/",
                 "/inventory/replenishment/", "/inventory/reporting/stock/", "/inventory/reporting/locations/",
@@ -280,7 +280,7 @@ class Roles(Base):
         stock.new_picking  # noqa
         self.client.post(f"/inventory/transfer/{pk.pk}/validate/")
         self.assertEqual(Picking.objects.get(pk=pk.pk).state, Picking.DRAFT)
-        r = self.client.post(f"/inventory/products/{self.p.pk}/", {"name": "Hacked", "internal_ref": "T1"})
+        r = self.client.post(f"/inventory/products/{self.p.pk}/edit/", {"name": "Hacked", "internal_ref": "T1"})
         self.assertEqual(r.status_code, 302)
         self.p.refresh_from_db()
         self.assertEqual(self.p.name, "Tyre")
@@ -431,7 +431,7 @@ class AuditAndUsers(Base):
 
     def test_product_change_is_logged_with_old_and_new_price(self):
         from .models import AuditLog
-        self.client.post(f"/inventory/products/{self.p.pk}/", {"name": "Tyre", "internal_ref": "T1", "product_type": "goods",
+        self.client.post(f"/inventory/products/{self.p.pk}/edit/", {"name": "Tyre", "internal_ref": "T1", "product_type": "goods",
                                                                "price": "250", "cost": "0", "tax_type": "A", "zra_item_type": "2",
                                                                "active": "on", "min_qty": "0", "max_qty": "0", "secondary_price": "0"})
         e = AuditLog.objects.filter(action="product changed").first()
@@ -729,3 +729,22 @@ class QueryBudget(Base):
         from inventory.services import stock
         p = Product.objects.create(name="Same", internal_ref="QB-S", price=1, cost=1)
         self.assertEqual(stock.with_on_hand([p])[0].on_hand, Product.objects.get(pk=p.pk).on_hand)
+
+
+class ProductPage(Base):
+    def test_full_view_shows_stock_price_and_edit_link(self):
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("boss", password="x", is_staff=True)
+        self.client.force_login(u)
+        r = self.client.get(f"/inventory/products/{self.p.pk}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.p.name)
+        self.assertContains(r, f"/inventory/products/{self.p.pk}/edit/")
+
+    def test_read_only_user_can_open_but_gets_no_edit_button(self):
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.create_user("viewer", password="x")
+        self.client.force_login(u)
+        r = self.client.get(f"/inventory/products/{self.p.pk}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "Edit product")

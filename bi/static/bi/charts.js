@@ -32,8 +32,8 @@
   }
 
   // points: [[label, value], ...]; future: optional dashed continuation
-  window.lineChart = function (box, points, future) {
-    var W = 720, H = 270, L = 44, B = 28, T = 14, all = points.concat(future || []), id = 'lg' + (++uid);
+  window.lineChart = function (box, points, future, opts) {
+    var W = (opts && opts.W) || 720, H = (opts && opts.H) || 270, L = 44, B = 28, T = 14, all = points.concat(future || []), id = 'lg' + (++uid);
     if (!all.length) { box.textContent = 'No data'; return; }
     var s = svg(box, W, H), t = tip(box), max = Math.max.apply(null, all.map(function (p) { return p[1]; })) || 1;
     max *= 1.1;

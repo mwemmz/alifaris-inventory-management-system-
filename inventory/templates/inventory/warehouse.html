@@ -22,7 +22,7 @@
 <h2 class="sec">Most below their minimum</h2>
 {% if low %}
 <table class="t"><tr><th>Product</th><th class="r">On hand</th><th class="r">Minimum</th><th class="r">To order</th></tr>
-{% for r in low %}<tr><td><a href="{% url 'inventory:product_edit' r.product.pk %}">{{ r.product }}</a></td><td class="r">{{ r.on_hand|floatformat:"-2" }}</td><td class="r">{{ r.min|floatformat:"-2" }}</td><td class="r">{{ r.to_order|floatformat:"-2" }}</td></tr>{% endfor %}
+{% for r in low %}<tr><td><a href="{% url 'inventory:product_view' r.product.pk %}">{{ r.product }}</a></td><td class="r">{{ r.on_hand|floatformat:"-2" }}</td><td class="r">{{ r.min|floatformat:"-2" }}</td><td class="r">{{ r.to_order|floatformat:"-2" }}</td></tr>{% endfor %}
 </table>
 {% if low_total > low|length %}<p class="muted">Showing {{ low|length }} of {{ low_total }}. <a href="{% url 'inventory:replenishment' %}">See all</a></p>{% endif %}
 {% else %}<p class="muted">Nothing is below its reorder minimum.</p>{% endif %}

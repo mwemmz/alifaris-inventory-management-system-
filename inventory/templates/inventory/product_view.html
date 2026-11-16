@@ -1,0 +1,58 @@
+{% extends "inventory/base.html" %}
+{% load static %}
+{% block body %}
+<div class="pv-top">
+  <a class="pv-back" href="{% url 'inventory:products' %}">&lsaquo; All products</a>
+  <div class="pv-actions">
+    <a class="btn ghost" href="{% url 'inventory:report_moves' %}?product={{ p.pk }}">All movements</a>
+    {% if can_edit %}<a class="btn" href="{% url 'inventory:product_edit' p.pk %}">Edit product</a>{% endif %}
+  </div>
+</div>
+
+<section class="card pv-hero">
+  <div class="pv-img">{% if p.image %}<img src="{{ p.image.url }}" alt="{{ p.name }}">{% else %}<span>{{ p.name|slice:":2"|upper }}</span>{% endif %}</div>
+  <div class="pv-head">
+    <div class="pv-pills"><span class="pill {{ status.0 }}">{{ status.1 }}</span>{% if not p.active %}<span class="pill">Archived</span>{% endif %}{% if p.zra_registered %}<span class="pill ok">Registered with ZRA</span>{% endif %}</div>
+    <h1>{{ p.name }}</h1>
+    <div class="pv-meta"><span>{{ p.internal_ref }}</span>{% if p.category %}<span>{{ p.category }}</span>{% endif %}{% if p.barcode %}<span>Barcode {{ p.barcode }}</span>{% endif %}<span>{{ p.get_product_type_display }}</span></div>
+    {% if p.tracks_stock %}
+    <div class="pv-stock">
+      <div class="pv-onhand"><b>{{ on_hand|floatformat:"-3" }}</b><span>{{ p.uom|default:"units" }} on hand</span></div>
+      {% if target %}<div class="pv-gauge" title="{{ gauge }}% of target level"><i class="{{ status.0 }}" style="width:{{ gauge }}%"></i>{% if p.min_qty %}<em style="left:{% widthratio p.min_qty target 100 %}%"></em>{% endif %}</div>
+      <div class="pv-gl"><span>0</span>{% if p.min_qty %}<span>Reorder at {{ p.min_qty|floatformat:"-3" }}</span>{% endif %}<span>Target {{ target|floatformat:"-3" }}</span></div>{% endif %}
+    </div>{% endif %}
+  </div>
+  <div class="pv-stats">
+    <div><span class="lbl">Sales price</span><b><small>ZK</small>{{ p.price|floatformat:2 }}</b>{% if p.secondary_price %}<em>Secondary ZK {{ p.secondary_price|floatformat:2 }}</em>{% endif %}</div>
+    <div><span class="lbl">Cost</span><b><small>ZK</small>{{ p.cost|floatformat:2 }}</b>{% if margin is not None %}<em>{{ profit|floatformat:2 }} profit · {{ margin|floatformat:0 }}% margin</em>{% endif %}</div>
+    {% if p.tracks_stock %}<div><span class="lbl">Stock value</span><b><small>ZK</small>{{ stock_value|floatformat:"0g" }}</b><em>at cost</em></div>
+    <div><span class="lbl">Cover</span><b>{% if cover is not None %}{{ cover }}<small> days</small>{% else %}n/a{% endif %}</b><em>{% if cover is not None %}at the last 30 days' pace{% else %}no sales in 30 days{% endif %}</em></div>{% endif %}
+  </div>
+</section>
+
+{% if problems %}<div class="msg warning">ZRA check: {{ problems|join:"; " }}</div>{% endif %}
+
+<div class="pv-grid">
+  <section class="card pv-wide"><div class="pv-sh"><h3>Sales, last 30 days</h3>
+    <div class="pv-mini"><span><b>{{ units|floatformat:"-3" }}</b> sold</span><span><b>ZK {{ revenue|floatformat:"0g" }}</b> revenue</span><span><b>{{ order_count }}</b> orders</span></div></div>
+    <div id="pv-chart"></div></section>
+
+  <section class="card"><h3>Stock by location</h3>
+    {% if quants %}<table class="t"><tr><th>Location</th><th class="r">Quantity</th></tr>
+    {% for q in quants %}<tr><td>{{ q.location }}</td><td class="r">{{ q.qty|floatformat:"-3" }}</td></tr>{% endfor %}</table>
+    {% else %}<p class="muted">{% if p.tracks_stock %}No stock in any location.{% else %}Services are not stocked.{% endif %}</p>{% endif %}</section>
+
+  <section class="card"><h3>Details</h3>
+    <dl class="pv-dl"><dt>Tax type</dt><dd>{{ p.get_tax_type_display }}</dd><dt>ZRA item class</dt><dd>{{ p.zra_item_class_code|default:"-" }}</dd><dt>ZRA item type</dt><dd>{{ p.get_zra_item_type_display }}</dd>
+    <dt>Reorder min / max</dt><dd>{{ p.min_qty|floatformat:"-3" }} / {{ p.max_qty|floatformat:"-3" }}</dd><dt>Unit of measure</dt><dd>{{ p.uom|default:"-" }}</dd><dt>Added</dt><dd>{{ p.created|date:"j M Y" }}</dd><dt>Last changed</dt><dd>{{ p.updated|date:"j M Y H:i" }}</dd></dl></section>
+
+  <section class="card pv-wide"><h3>Recent stock movements</h3>
+    {% if moves %}<table class="t"><tr><th>Date</th><th>Type</th><th>From</th><th>To</th><th class="r">Qty</th></tr>
+    {% for m in moves %}<tr><td>{{ m.date|date:"j M H:i" }}</td><td>{% if m.picking %}<a href="{% url 'inventory:picking_detail' m.picking_id %}">{{ m.kind }}</a>{% else %}{{ m.kind }}{% endif %}</td><td>{{ m.source }}</td><td>{{ m.dest }}</td>
+      <td class="r pv-{{ m.dir }}">{% if m.dir == "in" %}+{% elif m.dir == "out" %}&minus;{% endif %}{{ m.qty|floatformat:"-3" }}</td></tr>{% endfor %}</table>
+    {% else %}<p class="muted">No movements yet.</p>{% endif %}</section>
+</div>
+<script src="{% static 'bi/charts.js' %}"></script>
+{{ trend|json_script:"trend" }}
+<script>var T=JSON.parse(document.getElementById('trend').textContent);if(T.some(function(p){return p[1]})){lineChart(document.getElementById('pv-chart'),T,null,{W:1100,H:250})}else{document.getElementById('pv-chart').innerHTML='<p class="muted">No sales of this product in the last 30 days.</p>'}</script>
+{% endblock %}

@@ -383,6 +383,56 @@ def products(request):
 
 
 @login_required
+def product_view(request, pk):
+    """Read-only full view of one product: price, margin, stock by location, sales, movements."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from pos.models import PosOrder, PosOrderLine
+    p = get_object_or_404(Product.objects.select_related("category", "uom"), pk=pk)
+    on_hand = p.on_hand
+    quants = [q for q in p.quants.select_related("location__warehouse").filter(location__usage=Location.INTERNAL) if q.qty]
+    now = timezone.now()
+    since = now - timedelta(days=30)
+    per_day = {(since + timedelta(days=i + 1)).date().isoformat(): Decimal("0") for i in range(30)}
+    units = revenue = Decimal("0")
+    orders = set()
+    for ln in PosOrderLine.objects.filter(product=p, order__created_at__gte=since).select_related("order"):
+        sign = -1 if ln.order.kind == PosOrder.REFUND else 1
+        units += sign * ln.qty
+        revenue += sign * ln.line_total
+        orders.add(ln.order_id)
+        d = timezone.localtime(ln.order.created_at).date().isoformat()
+        if d in per_day:
+            per_day[d] += sign * ln.line_total
+    daily = units / 30
+    cover = round(on_hand / daily) if daily > 0 else None
+    profit = p.price - p.cost
+    margin = (profit / p.price * 100) if p.price else None
+    target = p.max_qty if p.max_qty > p.min_qty else (p.min_qty * 2 if p.min_qty else 0)
+    gauge = min(100, round(on_hand * 100 / target)) if target and on_hand > 0 else 0
+    if not p.tracks_stock:
+        status = ("ok", "Service")
+    elif on_hand <= 0:
+        status = ("bad", "Out of stock")
+    elif p.min_qty and on_hand < p.min_qty:
+        status = ("plan", "Low stock")
+    else:
+        status = ("ok", "In stock")
+    moves = []
+    for m in p.moves.select_related("source__warehouse", "dest__warehouse", "picking__op_type")[:12]:
+        si, di = m.source.usage == Location.INTERNAL, m.dest.usage == Location.INTERNAL
+        m.dir = "in" if di and not si else "out" if si and not di else "move"
+        moves.append(m)
+    return render(request, "inventory/product_view.html", ctx(
+        request, p=p, on_hand=on_hand, quants=quants, status=status, gauge=gauge, target=target, profit=profit,
+        margin=margin, stock_value=on_hand * p.cost, units=units, revenue=revenue, order_count=len(orders),
+        cover=cover, moves=moves, trend=[[d, float(v)] for d, v in per_day.items()],
+        problems=zra.check_item(p) if request.user.is_staff else []))
+
+
+@login_required
 @post_needs_editor
 def product_edit(request, pk=None):
     product = get_object_or_404(Product, pk=pk) if pk else None
@@ -395,7 +445,7 @@ def product_edit(request, pk=None):
         audit.log(request, "product changed" if product else "product created", saved,
                   "; ".join(changed))
         messages.success(request, f"Saved {saved.name}")
-        return redirect("inventory:product_edit", pk=saved.pk)
+        return redirect("inventory:product_view", pk=saved.pk)
     ctx_extra = {"product": product, "on_hand": product.on_hand if product else None}
     if product:
         ctx_extra["quants"] = product.quants.select_related("location").filter(location__usage=Location.INTERNAL)

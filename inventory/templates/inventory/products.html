@@ -13,12 +13,12 @@
 </div>
 {% if view == 'list' %}
 <table class="list"><thead><tr><th>Ref</th><th>Product</th><th>Price</th><th>Sec. price</th><th>Cost</th><th>On hand</th><th>ZRA</th></tr></thead><tbody>
-{% for p in page %}<tr class="click" data-href="{% url 'inventory:product_edit' p.pk %}"><td>{{ p.internal_ref }}</td><td>{{ p.name }}</td><td>{{ p.price }}</td><td>{{ p.secondary_price }}</td><td>{{ p.cost }}</td><td class="{% if p.qty_on_hand <= 0 %}zero{% endif %}">{{ p.qty_on_hand }}</td><td>{% if p.zra_registered %}Registered{% else %}-{% endif %}</td></tr>
+{% for p in page %}<tr class="click" data-href="{% url 'inventory:product_view' p.pk %}"><td>{{ p.internal_ref }}</td><td>{{ p.name }}</td><td>{{ p.price }}</td><td>{{ p.secondary_price }}</td><td>{{ p.cost }}</td><td class="{% if p.qty_on_hand <= 0 %}zero{% endif %}">{{ p.qty_on_hand }}</td><td>{% if p.zra_registered %}Registered{% else %}-{% endif %}</td></tr>
 {% empty %}<tr><td colspan="7" class="empty">No products found.</td></tr>{% endfor %}</tbody></table>
 {% else %}
 <div class="kanban">
 {% for p in page %}
-  <a class="kcard" href="{% url 'inventory:product_edit' p.pk %}">
+  <a class="kcard" href="{% url 'inventory:product_view' p.pk %}">
     <span class="kthumb">{% if p.image %}<img src="{{ p.image.url }}" alt="">{% else %}{{ p.name|slice:":2"|upper }}{% endif %}</span>
     <div class="ktxt"><b>{{ p.name }}</b><span class="ref">{{ p.internal_ref }}</span>
       <span class="kprice">ZK {{ p.price }}</span><span class="ksec">Secondary ZK {{ p.secondary_price }}</span></div>
